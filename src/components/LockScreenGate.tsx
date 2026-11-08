@@ -94,18 +94,18 @@ export const LockScreenGate: React.FC<LockScreenGateProps> = ({
   return (
     <div
       id="lock-screen-gate"
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#08080c] text-white select-none overflow-y-auto px-4 py-6 sm:py-10 min-h-screen"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#0e0e11] text-white select-none overflow-y-auto px-4 py-8 min-h-screen"
       style={{
-        backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(245, 158, 11, 0.12) 0%, rgba(8, 8, 12, 0.99) 75%)'
+        backgroundImage: 'radial-gradient(circle at 50% 28%, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0.04) 35%, rgba(14, 14, 17, 1) 65%)'
       }}
     >
-      {/* Top ambient space - Only visible for Whitelisted Admin */}
-      <div className="w-full max-w-md flex justify-end min-h-[32px] pt-2">
+      {/* Top Whitelisted Admin Button if whitelisted */}
+      <div className="w-full max-w-sm sm:max-w-md flex justify-end min-h-[32px] pt-1">
         {isWhitelistedAdmin && (
           <button
             type="button"
             onClick={onOpenAdmin}
-            className="px-3 py-1 text-xs font-bold text-amber-400 bg-[#161622] hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md animate-in fade-in"
+            className="px-3 py-1 text-xs font-bold text-amber-400 bg-[#191922] hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md animate-in fade-in"
             title="Dành cho Quản trị viên"
           >
             <Crown className="w-3.5 h-3.5 text-amber-400" />
@@ -115,74 +115,72 @@ export const LockScreenGate: React.FC<LockScreenGateProps> = ({
       </div>
 
       {/* Main Lock Card Container */}
-      <div className="w-full max-w-md my-auto flex flex-col items-center text-center space-y-5 py-4">
-        {/* Glowing Lock Icon Container */}
-        <div className="relative flex items-center justify-center">
-          <div className="absolute -inset-2 rounded-[32px] bg-amber-500/15 blur-xl animate-pulse" />
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-[#1a1a24] border border-[#2d2d3f] flex items-center justify-center shadow-2xl shadow-amber-500/10">
-            <Lock className="w-12 h-12 sm:w-14 sm:h-14 text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)] stroke-[2.2]" />
-          </div>
+      <div className="w-full max-w-sm sm:max-w-md my-auto flex flex-col items-center text-center space-y-6 py-2">
+        {/* Naked Glowing Amber Lock Icon */}
+        <div className="relative flex items-center justify-center my-2">
+          <div className="absolute w-28 h-28 rounded-full bg-amber-500/20 blur-2xl animate-pulse" />
+          <Lock className="relative w-16 h-16 sm:w-20 sm:h-20 text-amber-500 drop-shadow-[0_0_22px_rgba(245,158,11,0.85)] stroke-[2.2]" />
         </div>
 
         {/* Header Titles */}
-        <div className="space-y-2 px-2 text-center max-w-sm sm:max-w-md">
+        <div className="space-y-2.5 px-2 text-center max-w-xs sm:max-w-sm mx-auto">
           <h1 className="text-2xl sm:text-3xl font-black tracking-wider text-white uppercase">
             YÊU CẦU KÍCH HOẠT
           </h1>
           <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
-            Phiên bản dùng thử 3 ngày của bạn đã hết hạn. Vui lòng gửi mã bên dưới cho quản trị viên để mở khóa hoặc gia hạn thời gian sử dụng.
+            Phiên bản dùng thử của bạn đã hết hạn. Vui lòng gửi mã bên dưới cho quản trị viên để mở khóa vĩnh viễn.
           </p>
         </div>
 
-        {/* Member Code Box (Matching Screenshot_20261108_230016) */}
-        <div className="w-full bg-[#13131c] border border-[#232332] rounded-3xl p-5 sm:p-6 shadow-2xl space-y-3.5 max-w-sm sm:max-w-md">
-          <div className="text-center space-y-1">
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest block">
+        {/* Member Code Card Box */}
+        <div className="w-full bg-[#1c1c22] border border-[#2b2b36] rounded-3xl p-6 sm:p-7 shadow-2xl space-y-5 max-w-sm sm:max-w-md">
+          <div className="text-center space-y-1.5">
+            <span className="text-[11px] sm:text-xs font-bold text-zinc-400 uppercase tracking-widest block">
               MÃ THÀNH VIÊN CỦA BẠN
             </span>
-            <div className="flex items-center justify-center gap-2.5 pt-1">
+            <div className="flex items-center justify-center gap-2 pt-1">
               <span className="font-mono text-2xl sm:text-3xl font-black text-[#00a2ff] tracking-wider select-all break-all">
                 {displayMemberCode}
               </span>
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="p-2 text-[#00a2ff] hover:text-white bg-[#1a2333] hover:bg-[#202d42] border border-[#00a2ff]/30 rounded-xl transition cursor-pointer shrink-0 active:scale-95"
+                className="p-1.5 text-[#00a2ff] hover:text-white transition cursor-pointer shrink-0 active:scale-90"
                 title="Sao chép Mã Thành Viên"
               >
-                {copied ? <Check className="w-4.5 h-4.5 text-emerald-400" /> : <Copy className="w-4.5 h-4.5" />}
+                {copied ? <Check className="w-5 h-5 text-emerald-400" /> : <Copy className="w-5 h-5" />}
               </button>
             </div>
             {copied && (
-              <p className="text-[11px] font-semibold text-emerald-400 animate-in fade-in duration-200 pt-0.5">
-                ✓ Đã sao chép mã thành viên vào clipboard!
+              <p className="text-[11px] font-semibold text-emerald-400 animate-in fade-in duration-200">
+                ✓ Đã sao chép mã thành viên!
               </p>
             )}
           </div>
 
-          {/* Button 1: LIÊN HỆ QUẢN TRỊ VIÊN ĐỂ MỞ VIP */}
+          {/* Button 1: LIÊN HỆ QUẢN TRỊ VIÊN */}
           <button
             type="button"
             onClick={() => setShowContactModal(true)}
-            className="w-full py-3.5 px-4 bg-[#00a2ff] hover:bg-[#0091ff] text-white font-extrabold rounded-2xl text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-[#00a2ff]/25 active:scale-[0.98] transition cursor-pointer uppercase"
+            className="w-full py-3.5 px-4 bg-[#0088ff] hover:bg-[#0077ee] text-white font-extrabold rounded-2xl text-xs sm:text-sm tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#0088ff]/25 active:scale-[0.98] transition cursor-pointer uppercase"
           >
             <Headphones className="w-4.5 h-4.5 stroke-[2.5]" />
-            <span>LIÊN HỆ QUẢN TRỊ VIÊN ĐỂ MỞ VIP</span>
+            <span>LIÊN HỆ QUẢN TRỊ VIÊN</span>
           </button>
 
-          {/* Button 2: Đã được cấp quyền? Bấm để kiểm tra lại */}
+          {/* Quick Realtime Sync Check */}
           <button
             type="button"
             onClick={handleManualSync}
             disabled={isSyncing}
-            className="w-full py-3 px-3 bg-[#1c1c28] hover:bg-[#232332] text-zinc-200 border border-[#2a2a3d] rounded-2xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-[0.98]"
+            className="w-full py-2.5 px-3 bg-[#16161c] hover:bg-[#202028] text-zinc-300 border border-[#262632] rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-[0.98]"
           >
-            <RefreshCw className={`w-4 h-4 text-[#00a2ff] ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Đang kiểm tra dữ liệu máy chủ...' : 'Đã được cấp quyền? Bấm để kiểm tra lại'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 text-[#00a2ff] ${isSyncing ? 'animate-spin' : ''}`} />
+            <span>{isSyncing ? 'Đang kiểm tra máy chủ...' : 'Đã được cấp quyền? Bấm để kiểm tra lại'}</span>
           </button>
 
-          {/* Alert Box (Action Message) */}
-          {actionMessage ? (
+          {/* Action Message Alert if user interacted */}
+          {actionMessage && (
             <div
               className={`p-3 rounded-2xl text-xs font-medium flex items-start gap-2 text-left transition animate-in fade-in ${
                 actionMessage.isError
@@ -197,21 +195,13 @@ export const LockScreenGate: React.FC<LockScreenGateProps> = ({
               )}
               <span className="leading-relaxed">{actionMessage.text}</span>
             </div>
-          ) : (
-            <div className="p-3 rounded-2xl text-xs font-medium flex items-start gap-2.5 text-left bg-[#281318] border border-rose-900/60 text-rose-200">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-              <span className="leading-relaxed">
-                Chưa tìm thấy gói VIP mới trên máy chủ. Vui lòng nhắn Admin cấp thời gian rồi bấm Kiểm tra lại!
-              </span>
-            </div>
           )}
         </div>
       </div>
 
-      {/* Footer info matching reference screenshot */}
-      <div className="w-full text-center space-y-1 py-4 text-zinc-500 text-xs">
-        <p className="font-semibold text-zinc-400 tracking-wide">vTranslate v6.6 Dùng thử</p>
-        <p className="text-[10.5px] text-zinc-600">Được bảo vệ & chứng thực bởi Firebase Cloud Realtime License</p>
+      {/* Footer info matching image */}
+      <div className="w-full text-center py-4 text-zinc-500 text-xs font-medium">
+        vTranslate v8.1 Dùng thử
       </div>
 
       {/* Modal Liên Hệ Quản Trị Viên */}
