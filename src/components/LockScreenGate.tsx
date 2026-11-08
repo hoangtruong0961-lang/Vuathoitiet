@@ -94,100 +94,100 @@ export const LockScreenGate: React.FC<LockScreenGateProps> = ({
   return (
     <div
       id="lock-screen-gate"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-between bg-[#08080c] text-white select-none overflow-y-auto px-4 py-8 sm:py-12"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-between bg-[#08080c] text-white select-none overflow-y-auto px-4 py-6 sm:py-10 min-h-screen"
       style={{
-        backgroundImage: 'radial-gradient(circle at 50% 25%, rgba(245, 158, 11, 0.08) 0%, rgba(8, 8, 12, 0.98) 70%)'
+        backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(245, 158, 11, 0.12) 0%, rgba(8, 8, 12, 0.99) 75%)'
       }}
     >
       {/* Top ambient space - Only visible for Whitelisted Admin */}
-      <div className="w-full max-w-md flex justify-end min-h-[30px]">
+      <div className="w-full max-w-md flex justify-end min-h-[32px] pt-2">
         {isWhitelistedAdmin && (
           <button
             type="button"
             onClick={onOpenAdmin}
-            className="px-2.5 py-1 text-[11px] font-bold text-amber-400 bg-slate-900/80 hover:bg-amber-500/20 border border-amber-500/30 rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-sm animate-in fade-in"
+            className="px-3 py-1 text-xs font-bold text-amber-400 bg-[#161622] hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md animate-in fade-in"
             title="Dành cho Quản trị viên"
           >
-            <Crown className="w-3 h-3 text-amber-400" />
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
             <span>Quản trị viên</span>
           </button>
         )}
       </div>
 
       {/* Main Lock Card Container */}
-      <div className="w-full max-w-md my-auto flex flex-col items-center text-center space-y-6">
-        {/* Glowing Lock Icon */}
+      <div className="w-full max-w-md my-auto flex flex-col items-center text-center space-y-5 py-4">
+        {/* Glowing Lock Icon Container */}
         <div className="relative flex items-center justify-center">
-          <div className="absolute -inset-2 rounded-3xl bg-amber-500/20 blur-xl animate-pulse" />
-          <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-b from-[#1e1a29] to-[#121118] border border-amber-500/30 flex items-center justify-center shadow-2xl shadow-amber-500/20">
-            <Lock className="w-10 h-10 sm:w-12 sm:h-12 text-amber-400 drop-shadow-[0_0_12px_rgba(245,158,11,0.6)]" />
+          <div className="absolute -inset-2 rounded-[32px] bg-amber-500/15 blur-xl animate-pulse" />
+          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-[#1a1a24] border border-[#2d2d3f] flex items-center justify-center shadow-2xl shadow-amber-500/10">
+            <Lock className="w-12 h-12 sm:w-14 sm:h-14 text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)] stroke-[2.2]" />
           </div>
         </div>
 
         {/* Header Titles */}
-        <div className="space-y-2.5 px-2">
+        <div className="space-y-2 px-2 text-center max-w-sm sm:max-w-md">
           <h1 className="text-2xl sm:text-3xl font-black tracking-wider text-white uppercase">
             YÊU CẦU KÍCH HOẠT
           </h1>
-          <p className="text-xs sm:text-sm text-slate-300/90 leading-relaxed max-w-sm mx-auto">
+          <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
             Phiên bản dùng thử 3 ngày của bạn đã hết hạn. Vui lòng gửi mã bên dưới cho quản trị viên để mở khóa hoặc gia hạn thời gian sử dụng.
           </p>
         </div>
 
-        {/* Member Code Box (Matching uploaded reference design) */}
-        <div className="w-full bg-[#16161f] border border-[#272738] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-          <div className="space-y-1.5">
-            <span className="text-[11px] sm:text-xs font-bold text-slate-400 uppercase tracking-widest block">
+        {/* Member Code Box (Matching Screenshot_20261108_230016) */}
+        <div className="w-full bg-[#13131c] border border-[#232332] rounded-3xl p-5 sm:p-6 shadow-2xl space-y-3.5 max-w-sm sm:max-w-md">
+          <div className="text-center space-y-1">
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest block">
               MÃ THÀNH VIÊN CỦA BẠN
             </span>
-            <div className="flex items-center justify-center gap-2.5 py-1">
-              <span className="font-mono text-xl sm:text-2xl font-black text-sky-400 tracking-wider select-all break-all">
+            <div className="flex items-center justify-center gap-2.5 pt-1">
+              <span className="font-mono text-2xl sm:text-3xl font-black text-[#00a2ff] tracking-wider select-all break-all">
                 {displayMemberCode}
               </span>
               <button
                 type="button"
                 onClick={handleCopyCode}
-                className="p-1.5 text-sky-400 hover:text-white bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/20 rounded-lg transition cursor-pointer shrink-0"
+                className="p-2 text-[#00a2ff] hover:text-white bg-[#1a2333] hover:bg-[#202d42] border border-[#00a2ff]/30 rounded-xl transition cursor-pointer shrink-0 active:scale-95"
                 title="Sao chép Mã Thành Viên"
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                {copied ? <Check className="w-4.5 h-4.5 text-emerald-400" /> : <Copy className="w-4.5 h-4.5" />}
               </button>
             </div>
             {copied && (
-              <p className="text-[11px] font-semibold text-emerald-400 animate-in fade-in duration-200">
+              <p className="text-[11px] font-semibold text-emerald-400 animate-in fade-in duration-200 pt-0.5">
                 ✓ Đã sao chép mã thành viên vào clipboard!
               </p>
             )}
           </div>
 
-          {/* Primary Action Button: Liên Hệ Quản Trị Viên */}
+          {/* Button 1: LIÊN HỆ QUẢN TRỊ VIÊN ĐỂ MỞ VIP */}
           <button
             type="button"
             onClick={() => setShowContactModal(true)}
-            className="w-full py-3.5 px-4 bg-sky-500 hover:bg-sky-400 text-white font-bold rounded-xl text-sm sm:text-base tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-sky-500/30 active:scale-[0.98] transition cursor-pointer"
+            className="w-full py-3.5 px-4 bg-[#00a2ff] hover:bg-[#0091ff] text-white font-extrabold rounded-2xl text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-[#00a2ff]/25 active:scale-[0.98] transition cursor-pointer uppercase"
           >
-            <Headphones className="w-5 h-5" />
+            <Headphones className="w-4.5 h-4.5 stroke-[2.5]" />
             <span>LIÊN HỆ QUẢN TRỊ VIÊN ĐỂ MỞ VIP</span>
           </button>
 
-          {/* Quick Realtime Sync Check */}
+          {/* Button 2: Đã được cấp quyền? Bấm để kiểm tra lại */}
           <button
             type="button"
             onClick={handleManualSync}
             disabled={isSyncing}
-            className="w-full py-2.5 px-3 bg-[#1e1e2c] hover:bg-[#252538] text-slate-200 border border-slate-700/60 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+            className="w-full py-3 px-3 bg-[#1c1c28] hover:bg-[#232332] text-zinc-200 border border-[#2a2a3d] rounded-2xl text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50 active:scale-[0.98]"
           >
-            <RefreshCw className={`w-4 h-4 text-emerald-400 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-[#00a2ff] ${isSyncing ? 'animate-spin' : ''}`} />
             <span>{isSyncing ? 'Đang kiểm tra dữ liệu máy chủ...' : 'Đã được cấp quyền? Bấm để kiểm tra lại'}</span>
           </button>
 
-          {/* Action Message Alert */}
-          {actionMessage && (
+          {/* Alert Box (Action Message) */}
+          {actionMessage ? (
             <div
-              className={`p-2.5 rounded-xl text-xs font-semibold flex items-start gap-2 text-left ${
+              className={`p-3 rounded-2xl text-xs font-medium flex items-start gap-2 text-left transition animate-in fade-in ${
                 actionMessage.isError
-                  ? 'bg-rose-500/10 border border-rose-500/30 text-rose-300'
-                  : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-300'
+                  ? 'bg-[#281318] border border-rose-900/60 text-rose-200'
+                  : 'bg-[#0f281b] border border-emerald-900/60 text-emerald-200'
               }`}
             >
               {actionMessage.isError ? (
@@ -195,16 +195,23 @@ export const LockScreenGate: React.FC<LockScreenGateProps> = ({
               ) : (
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               )}
-              <span className="leading-snug">{actionMessage.text}</span>
+              <span className="leading-relaxed">{actionMessage.text}</span>
+            </div>
+          ) : (
+            <div className="p-3 rounded-2xl text-xs font-medium flex items-start gap-2.5 text-left bg-[#281318] border border-rose-900/60 text-rose-200">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">
+                Chưa tìm thấy gói VIP mới trên máy chủ. Vui lòng nhắn Admin cấp thời gian rồi bấm Kiểm tra lại!
+              </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Footer info matching reference */}
-      <div className="w-full text-center space-y-1 pt-6 text-slate-500 text-xs">
-        <p className="font-medium tracking-wide">vTranslate v6.6 Dùng thử</p>
-        <p className="text-[10px] text-slate-600">Được bảo vệ & chứng thực bởi Firebase Cloud Realtime License</p>
+      {/* Footer info matching reference screenshot */}
+      <div className="w-full text-center space-y-1 py-4 text-zinc-500 text-xs">
+        <p className="font-semibold text-zinc-400 tracking-wide">vTranslate v6.6 Dùng thử</p>
+        <p className="text-[10.5px] text-zinc-600">Được bảo vệ & chứng thực bởi Firebase Cloud Realtime License</p>
       </div>
 
       {/* Modal Liên Hệ Quản Trị Viên */}

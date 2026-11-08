@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+html, body, #root {
+  background-color: #08080c;
+  color: #ffffff;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+}
+
 @layer utilities {
   /* Metallic background & card textures */
   .bg-metallic-dark {
