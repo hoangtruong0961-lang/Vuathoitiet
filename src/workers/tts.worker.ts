@@ -54,6 +54,7 @@ self.onmessage = async (e: MessageEvent<TTSWorkerMessage>) => {
           nghiVoice: voice || 'lacphi',
           tiktokVoice: voice || 'BV074_streaming',
           edgeVoice: voice || 'vi-VN-HoaiMyNeural',
+          vieneuVoice: voice || 'vi_female_north_1',
           ttsSpeed: speed,
           ttsPitch: pitch,
           targetDuration: effectiveDuration,

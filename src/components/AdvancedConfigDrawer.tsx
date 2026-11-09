@@ -23,7 +23,8 @@ import {
   Play,
   Bug,
 } from 'lucide-react';
-import { AppSettings, ApiConnectionMode } from '../types';
+import { AppSettings, ApiConnectionMode, ClonedVoice } from '../types';
+import { VoiceCloningModal } from './VoiceCloningModal';
 
 interface AdvancedConfigDrawerProps {
   formData: AppSettings;
@@ -90,6 +91,7 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'ocr' | 'tts' | 'proxy' | 'debug'>('ocr');
+  const [showVoiceCloningModal, setShowVoiceCloningModal] = useState<boolean>(false);
   const [isTestingBackend, setIsTestingBackend] = useState(false);
   const [backendTestStatus, setBackendTestStatus] = useState<{ success: boolean; msg: string } | null>(null);
 
@@ -509,6 +511,42 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
 
                   <label
                     className={`p-3 rounded-2xl border cursor-pointer transition flex items-center space-x-2 ${
+                      formData.ttsProvider === 'vieneu_tts'
+                        ? 'bg-purple-950/20 border-purple-500/50 text-white'
+                        : 'bg-[#0d0d11] border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="advancedTtsEngine"
+                      value="vieneu_tts"
+                      checked={formData.ttsProvider === 'vieneu_tts'}
+                      onChange={() => handleChange('ttsProvider', 'vieneu_tts')}
+                      className="accent-purple-500"
+                    />
+                    <span className="font-semibold">VieNeuTTS (Neural AI)</span>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-2xl border cursor-pointer transition flex items-center space-x-2 ${
+                      formData.ttsProvider === 'vieneu_turbo'
+                        ? 'bg-amber-950/20 border-amber-500/50 text-white'
+                        : 'bg-[#0d0d11] border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="advancedTtsEngine"
+                      value="vieneu_turbo"
+                      checked={formData.ttsProvider === 'vieneu_turbo'}
+                      onChange={() => handleChange('ttsProvider', 'vieneu_turbo')}
+                      className="accent-amber-500"
+                    />
+                    <span className="font-semibold">⚡ VieNeuTTS Turbo (Siêu Tốc)</span>
+                  </label>
+
+                  <label
+                    className={`p-3 rounded-2xl border cursor-pointer transition flex items-center space-x-2 ${
                       formData.ttsProvider === 'tiktok_tts'
                         ? 'bg-sky-950/20 border-sky-500/50 text-white'
                         : 'bg-[#0d0d11] border-slate-800 text-slate-400'
@@ -524,13 +562,108 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
                     />
                     <span className="font-semibold">TikTok Voice TTS</span>
                   </label>
+
+                  <label
+                    className={`p-3 rounded-2xl border cursor-pointer transition flex items-center space-x-2 ${
+                      formData.ttsProvider === 'cloned_voice'
+                        ? 'bg-rose-950/20 border-rose-500/50 text-white'
+                        : 'bg-[#0d0d11] border-slate-800 text-slate-400'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="advancedTtsEngine"
+                      value="cloned_voice"
+                      checked={formData.ttsProvider === 'cloned_voice'}
+                      onChange={() => handleChange('ttsProvider', 'cloned_voice')}
+                      className="accent-rose-500"
+                    />
+                    <span className="font-semibold text-rose-300">🎭 Nhân bản giọng nói (Voice Clone)</span>
+                  </label>
+                </div>
+
+                <div className="pt-2 flex justify-start">
+                  <button
+                    type="button"
+                    onClick={() => setShowVoiceCloningModal(true)}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600/30 to-purple-600/30 hover:from-rose-600/40 hover:to-purple-600/40 border border-rose-500/40 text-rose-200 text-xs font-bold flex items-center gap-2 transition-all shadow-md shadow-rose-950/20 cursor-pointer"
+                  >
+                    <span>🎙️</span>
+                    <span>Tải lên / Ghi âm nhân bản giọng nói...</span>
+                    {formData.clonedVoices && formData.clonedVoices.length > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-500/30 text-rose-300 text-[10px] font-mono">
+                        {formData.clonedVoices.length} giọng
+                      </span>
+                    )}
+                  </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="bg-[#0d0d11] border border-slate-800 p-3 rounded-2xl space-y-1">
                   <label className="text-[11px] font-semibold text-slate-300 block">Giọng đọc:</label>
-                  {(formData.ttsProvider || 'capcut_tts') === 'capcut_tts' ? (
+                  {formData.ttsProvider === 'cloned_voice' ? (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={formData.activeClonedVoiceId || (formData.clonedVoices?.[0]?.id || '')}
+                        onChange={(e) => {
+                          if (e.target.value === '__add__') {
+                            setShowVoiceCloningModal(true);
+                          } else {
+                            handleChange('activeClonedVoiceId', e.target.value);
+                          }
+                        }}
+                        className="w-full bg-[#16161e] border border-rose-500/40 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-rose-400"
+                      >
+                        {(formData.clonedVoices && formData.clonedVoices.length > 0) ? (
+                          <optgroup label="✨ Giọng của bạn">
+                            {formData.clonedVoices.map((v) => (
+                              <option key={v.id} value={v.id}>
+                                🎙️ {v.name} ({v.duration ? `${v.duration}s` : 'Mẫu'})
+                              </option>
+                            ))}
+                          </optgroup>
+                        ) : (
+                          <option value="" disabled>Chưa có giọng nào</option>
+                        )}
+                        <option value="__add__">➕ Thu âm / Tải giọng mới...</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowVoiceCloningModal(true)}
+                        className="px-2.5 py-2 bg-rose-600/30 hover:bg-rose-600/50 text-rose-300 rounded-xl text-xs font-bold shrink-0 border border-rose-500/30 transition-colors"
+                      >
+                        Quản lý
+                      </button>
+                    </div>
+                  ) : (formData.ttsProvider === 'vieneu_tts' || formData.ttsProvider === 'vieneu_turbo') ? (
+                    <select
+                      value={formData.vieneuVoice || 'Hải Đăng'}
+                      onChange={(e) => handleChange('vieneuVoice', e.target.value)}
+                      className="w-full bg-[#16161e] border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-400"
+                    >
+                      <optgroup label="⚡ VieNeu-TTS-v3-Turbo (Chính thức)">
+                        <option value="Hải Đăng">🎙️ Hải Đăng (Nam · Bắc · Tự nhiên)</option>
+                        <option value="Mai Anh">👩 Mai Anh (Nữ · Bắc · Tin tức)</option>
+                        <option value="Trúc Ly">🌸 Trúc Ly (Nữ · Bắc · Tự nhiên)</option>
+                        <option value="Thùy Dung">🎀 Thùy Dung (Nữ · Nam · Tin tức)</option>
+                        <option value="Ngọc Huyền">✨ Ngọc Huyền (Nữ · Bắc · Đọc tự nhiên)</option>
+                        <option value="Quang Sơn">⚡ Quang Sơn (Nam · Trung · Tự nhiên)</option>
+                        <option value="Ngọc Trân">🌺 Ngọc Trân (Nữ · Trung · Tự nhiên)</option>
+                        <option value="Thiện Minh">📖 Thiện Minh (Nam · Bắc · Kể chuyện)</option>
+                        <option value="Thiền Tâm Đức">🧘 Thiền Tâm Đức (Nam · Kể chuyện truyền cảm)</option>
+                        <option value="Adam bựa">🔥 Adam bựa (Nam · Bắc · Phong cách tự do)</option>
+                      </optgroup>
+                      <optgroup label="Dự phòng cũ">
+                        <option value="vi_female_north_1">Cô Gái Miền Bắc (Legacy)</option>
+                        <option value="vi_female_south_1">Cô Gái Miền Nam (Legacy)</option>
+                        <option value="vi_male_north_1">Chàng Trai Miền Bắc (Legacy)</option>
+                        <option value="vi_male_south_1">Chàng Trai Miền Nam (Legacy)</option>
+                        <option value="vi_female_central">Cô Gái Miền Trung (Legacy)</option>
+                        <option value="vi_female_reading">Giọng Đọc Truyện (Legacy)</option>
+                      </optgroup>
+                    </select>
+                  ) : (formData.ttsProvider || 'capcut_tts') === 'capcut_tts' ? (
                     <select
                       value={formData.capcutVoice || 'BV074_streaming'}
                       onChange={(e) => handleChange('capcutVoice', e.target.value)}
@@ -623,6 +756,25 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
                     </select>
                   )}
                 </div>
+
+                {(formData.ttsProvider === 'vieneu_tts' || formData.ttsProvider === 'vieneu_turbo' || formData.ttsProvider === 'cloned_voice') && (
+                  <div className="bg-[#0d0d11] border border-slate-800 p-3 rounded-2xl space-y-1.5 col-span-1 sm:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-semibold text-purple-300 block">Tùy chọn Endpoint audio.cpp / VieNeu Server (OpenAI format):</label>
+                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded-full font-mono">audio.cpp + Capacitor</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. http://192.168.1.x:8000 hoặc https://xxxx.trycloudflare.com (để trống nếu chạy local)"
+                      value={formData.vieneuApiUrl || ''}
+                      onChange={(e) => handleChange('vieneuApiUrl', e.target.value)}
+                      className="w-full bg-[#16161e] border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-600"
+                    />
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      💡 <strong>2 hướng chạy VieNeu Turbo:</strong> (1) Server <span className="text-purple-300 font-mono">audio.cpp</span> GGUF siêu nhẹ trên PC/Colab (tương thích OpenAI API), hoặc (2) Native Capacitor Plugin trên APK Android.
+                    </p>
+                  </div>
+                )}
 
                 <div className="bg-[#0d0d11] border border-slate-800 p-3 rounded-2xl space-y-1">
                   <div className="flex justify-between text-xs font-semibold text-slate-200">
@@ -878,6 +1030,33 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
           )}
         </div>
       )}
+
+      {/* Voice Cloning Modal */}
+      <VoiceCloningModal
+        isOpen={showVoiceCloningModal}
+        onClose={() => setShowVoiceCloningModal(false)}
+        clonedVoices={formData.clonedVoices || []}
+        activeClonedVoiceId={formData.activeClonedVoiceId}
+        onSaveVoice={(newVoice: ClonedVoice) => {
+          const list = formData.clonedVoices || [];
+          const updated = [newVoice, ...list.filter(v => v.id !== newVoice.id)];
+          handleChange('clonedVoices', updated);
+          handleChange('activeClonedVoiceId', newVoice.id);
+          handleChange('ttsProvider', 'cloned_voice');
+        }}
+        onDeleteVoice={(id: string) => {
+          const list = formData.clonedVoices || [];
+          const updated = list.filter(v => v.id !== id);
+          handleChange('clonedVoices', updated);
+          if (formData.activeClonedVoiceId === id) {
+            handleChange('activeClonedVoiceId', updated[0]?.id || '');
+          }
+        }}
+        onSelectVoice={(id: string) => {
+          handleChange('activeClonedVoiceId', id);
+          handleChange('ttsProvider', 'cloned_voice');
+        }}
+      />
     </div>
   );
 };

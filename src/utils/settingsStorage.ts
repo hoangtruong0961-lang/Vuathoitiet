@@ -1,4 +1,4 @@
-import { AppSettings } from '../types';
+import { AppSettings, TTSProviderOption } from '../types';
 import { saveSettingsToDB } from './idbStorage';
 
 const SETTINGS_STORAGE_KEY = 'subtranslate_app_settings_v1';
@@ -41,6 +41,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   tiktokSessionId: '',
   tiktokVoice: 'BV074_streaming',
   tiktokProxyUrl: '',
+  geminiVoice: 'Kore',
+  vieneuVoice: 'Hải Đăng',
+  vieneuApiUrl: '',
+  clonedVoices: [],
+  activeClonedVoiceId: '',
   ttsSpeed: 1.0,
   ttsPitch: 0,
   bgFilterStrength: 40,
@@ -66,15 +71,16 @@ export function getAppSettings(): AppSettings {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Migrate legacy providers to official 'capcut_tts'
-      const ttsProvider = (parsed.ttsProvider === 'nghi_tts' || parsed.ttsProvider === 'vieneu_tts' || parsed.ttsProvider === 'kokoro_tts')
-        ? 'capcut_tts'
-        : (parsed.ttsProvider || 'capcut_tts');
+      const validProviders: TTSProviderOption[] = ['capcut_tts', 'gemini', 'nghi_tts', 'edge_tts', 'tiktok_tts', 'browser', 'vieneu_tts', 'vieneu_turbo', 'cloned_voice'];
+      const ttsProvider = validProviders.includes(parsed.ttsProvider) ? parsed.ttsProvider : 'capcut_tts';
       return { 
         ...DEFAULT_APP_SETTINGS, 
         ...parsed, 
         ttsProvider, 
         capcutVoice: parsed.capcutVoice || 'BV074_streaming',
+        vieneuVoice: parsed.vieneuVoice || 'Hải Đăng',
+        clonedVoices: Array.isArray(parsed.clonedVoices) ? parsed.clonedVoices : [],
+        activeClonedVoiceId: parsed.activeClonedVoiceId || '',
         ocrEngine: parsed.ocrEngine || 'paddleocr',
         paddleOcrModelVariant: parsed.paddleOcrModelVariant === 'tiny' ? 'tiny' : 'small',
       };

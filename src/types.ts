@@ -221,7 +221,16 @@ export type PaddleOcrModelVariant = 'small' | 'tiny';
 
 export type ApiConnectionMode = 'direct' | 'proxy' | 'gemini_web' | 'groq';
 
-export type TTSProviderOption = 'capcut_tts' | 'gemini' | 'nghi_tts' | 'edge_tts' | 'tiktok_tts' | 'browser';
+export type TTSProviderOption = 'capcut_tts' | 'gemini' | 'nghi_tts' | 'edge_tts' | 'tiktok_tts' | 'browser' | 'vieneu_tts' | 'vieneu_turbo' | 'cloned_voice';
+
+export interface ClonedVoice {
+  id: string;
+  name: string;
+  createdAt: number;
+  duration?: number;
+  audioBase64: string;      // Base64 audio string (WAV or MP3, 3-8s)
+  mimeType?: string;
+}
 
 export interface AppSettings {
   ocrEngine: OCREngineOption;          // 'paddleocr' | 'gemini_vision'
@@ -254,7 +263,7 @@ export interface AppSettings {
   genDownloadApiKey?: string;         // GenDownload API Key (https://gendownload.com/)
   videoDownloaderApiUrl?: string;     // Custom Video Downloader API Endpoint
   backendServerUrl?: string;          // Remote Node.js / yt-dlp Backend URL (e.g. https://my-server.onrender.com for Capacitor APK)
-  ttsProvider?: TTSProviderOption;     // 'capcut_tts' | 'gemini' | 'nghi_tts' | 'edge_tts' | 'tiktok_tts' | 'browser'
+  ttsProvider?: TTSProviderOption;     // 'capcut_tts' | 'gemini' | 'nghi_tts' | 'edge_tts' | 'tiktok_tts' | 'browser' | 'vieneu_tts' | 'vieneu_turbo' | 'cloned_voice'
   capcutVoice?: string;                // CapCut Voice e.g. BV074_streaming (Cô Gái Hoạt Ngôn)
   nghiVoice?: string;                  // Nghi TTS Sherpa voice e.g. lacphi, duyoryx, ngochuyennew, ngocngan, maiphuong, minhquang
   edgeVoice?: string;                  // Edge TTS Voice e.g. vi-VN-HoaiMyNeural or vi-VN-NamMinhNeural
@@ -262,6 +271,10 @@ export interface AppSettings {
   tiktokVoice?: string;                // TikTok Voice e.g. vi_001 (Nữ Tiếng Việt)
   tiktokProxyUrl?: string;             // TikTok / Edge proxy URL (HTTP or SOCKS proxy)
   geminiVoice?: string;                // Gemini Voice e.g. Kore or Puck
+  vieneuVoice?: string;                // VieNeuTTS voice e.g. vi_female_north_1
+  vieneuApiUrl?: string;               // Custom VieNeuTTS API URL / Hugging Face space endpoint
+  clonedVoices?: ClonedVoice[];        // User custom cloned voice models
+  activeClonedVoiceId?: string;        // ID of active cloned voice
   ttsSpeed?: number;                   // Speed multiplier 0.5 - 2.0 (default 1.0)
   ttsPitch?: number;                   // Pitch offset -5 to +5 (default 0)
   bgFilterStrength?: number;           // Background text filter strength 0 - 100% (default 40)

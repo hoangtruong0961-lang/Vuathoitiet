@@ -39,10 +39,11 @@ import {
   ExternalLink,
   MessageCircle,
 } from 'lucide-react';
-import { Project, GeminiModelOption, AppSettings, VideoClip, TTSProviderOption } from '../types';
+import { Project, GeminiModelOption, AppSettings, VideoClip, TTSProviderOption, ClonedVoice } from '../types';
 import { storeMediaFileDB } from '../utils/idbStorage';
 import { ConfigView } from './ConfigView';
 import { MultiPlatformDownloaderView } from './MultiPlatformDownloaderView';
+import { VoiceCloningModal } from './VoiceCloningModal';
 import { LicenseState, isWhitelistedAdminMember } from '../utils/licenseManager';
 import { resolveApiUrl, isMobileCapacitor, getBackendBaseUrl } from '../utils/apiUrl';
 
@@ -90,12 +91,14 @@ export const CapCutHomeView: React.FC<CapCutHomeViewProps> = ({
   const [isTtsGenerating, setIsTtsGenerating] = useState<boolean>(false);
   const [ttsAudioUrl, setTtsAudioUrl] = useState<string | null>(null);
   const [ttsError, setTtsError] = useState<string | null>(null);
+  const [showVoiceCloningModal, setShowVoiceCloningModal] = useState<boolean>(false);
 
   const handleGenerateTts = async () => {
     if (!ttsText.trim()) return;
     setIsTtsGenerating(true);
     setTtsError(null);
     try {
+      const activeClone = appSettings.clonedVoices?.find(v => v.id === ttsVoice || v.id === appSettings.activeClonedVoiceId) || appSettings.clonedVoices?.[0];
       const res = await fetch(resolveApiUrl('/api/tts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,6 +108,10 @@ export const CapCutHomeView: React.FC<CapCutHomeViewProps> = ({
           voice: ttsVoice,
           speed: ttsSpeed,
           pitch: ttsPitch,
+          clonedVoiceAudio: activeClone?.audioBase64 || '',
+          clonedVoiceName: activeClone?.name || ttsVoice || 'Giọng Clone',
+          vieneuVoice: appSettings.vieneuVoice || 'Hải Đăng',
+          vieneuApiUrl: appSettings.vieneuApiUrl || '',
         }),
       });
 
@@ -1091,13 +1098,22 @@ export const CapCutHomeView: React.FC<CapCutHomeViewProps> = ({
                     onChange={(e) => {
                       const p = e.target.value as TTSProviderOption;
                       setTtsProvider(p);
-                      if (p === 'capcut_tts') setTtsVoice('BV001_streaming');
+                      if (p === 'cloned_voice') {
+                        const firstClone = appSettings.clonedVoices?.[0]?.id || '';
+                        setTtsVoice(firstClone);
+                        if (!firstClone) setShowVoiceCloningModal(true);
+                      }
+                      else if (p === 'capcut_tts') setTtsVoice('BV001_streaming');
                       else if (p === 'edge_tts') setTtsVoice('vi-VN-HoaiMyNeural');
                       else if (p === 'tiktok_tts') setTtsVoice('vi_female_01');
                       else if (p === 'nghi_tts') setTtsVoice('ngochuyennew');
+                      else if (p === 'vieneu_tts' || p === 'vieneu_turbo') setTtsVoice('Hải Đăng');
                     }}
                     className="w-full bg-[#121215] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
+                    <option value="cloned_voice">🎭 Nhân bản giọng nói (Voice Clone)</option>
+                    <option value="vieneu_turbo">⚡ VieNeuTTS Turbo (Siêu Tốc)</option>
+                    <option value="vieneu_tts">🔮 VieNeuTTS (Neural AI)</option>
                     <option value="capcut_tts">✨ CapCut TTS (K07VN)</option>
                     <option value="nghi_tts">Piper TTS (Sherpa-ONNX)</option>
                     <option value="edge_tts">Microsoft Edge TTS</option>
@@ -1106,14 +1122,64 @@ export const CapCutHomeView: React.FC<CapCutHomeViewProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-zinc-300 block">
-                    Giọng đọc:
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-semibold text-zinc-300 block">
+                      Giọng đọc:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowVoiceCloningModal(true)}
+                      className="text-[10px] text-sky-400 hover:text-sky-300 font-bold transition-colors flex items-center gap-1"
+                    >
+                      <span>🎙️</span>
+                      <span>+ Nhân bản giọng</span>
+                    </button>
+                  </div>
                   <select
                     value={ttsVoice}
-                    onChange={(e) => setTtsVoice(e.target.value)}
+                    onChange={(e) => {
+                      if (e.target.value === '__add_clone__') {
+                        setShowVoiceCloningModal(true);
+                      } else {
+                        setTtsVoice(e.target.value);
+                      }
+                    }}
                     className="w-full bg-[#121215] border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
+                    {ttsProvider === 'cloned_voice' && (
+                      <>
+                        {(appSettings.clonedVoices && appSettings.clonedVoices.length > 0) ? (
+                          appSettings.clonedVoices.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              🎙️ {v.name} ({v.duration ? `${v.duration}s` : 'Mẫu'})
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>Chưa có giọng clone nào</option>
+                        )}
+                        <option value="__add_clone__">➕ Thu âm / Tải file mẫu mới...</option>
+                      </>
+                    )}
+                    {(ttsProvider === 'vieneu_tts' || ttsProvider === 'vieneu_turbo') && (
+                      <>
+                        <option value="Hải Đăng">🎙️ Hải Đăng (Nam · Bắc · Tự nhiên)</option>
+                        <option value="Mai Anh">👩 Mai Anh (Nữ · Bắc · Tin tức)</option>
+                        <option value="Trúc Ly">🌸 Trúc Ly (Nữ · Bắc · Tự nhiên)</option>
+                        <option value="Thùy Dung">🎀 Thùy Dung (Nữ · Nam · Tin tức)</option>
+                        <option value="Ngọc Huyền">✨ Ngọc Huyền (Nữ · Bắc · Đọc)</option>
+                        <option value="Quang Sơn">⚡ Quang Sơn (Nam · Trung · Tự nhiên)</option>
+                        <option value="Ngọc Trân">🌺 Ngọc Trân (Nữ · Trung · Tự nhiên)</option>
+                        <option value="Thiện Minh">📖 Thiện Minh (Nam · Bắc · Kể chuyện)</option>
+                        <option value="Thiền Tâm Đức">🧘 Thiền Tâm Đức (Nam · Kể chuyện)</option>
+                        <option value="Adam bựa">🔥 Adam bựa (Nam · Bắc · Tự do)</option>
+                        <option value="vi_female_north_1">Cô Gái Miền Bắc (Legacy)</option>
+                        <option value="vi_female_south_1">Cô Gái Miền Nam (Legacy)</option>
+                        <option value="vi_male_north_1">Chàng Trai Miền Bắc (Legacy)</option>
+                        <option value="vi_male_south_1">Chàng Trai Miền Nam (Legacy)</option>
+                        <option value="vi_female_central">Cô Gái Miền Trung (Legacy)</option>
+                        <option value="vi_female_reading">Giọng Đọc Truyện (Legacy)</option>
+                      </>
+                    )}
                     {ttsProvider === 'capcut_tts' && (
                       <>
                         <option value="BV001_streaming">✨ K07VN (Nữ ngọt ngào)</option>
@@ -1324,6 +1390,47 @@ export const CapCutHomeView: React.FC<CapCutHomeViewProps> = ({
         )}
 
       </div>
+
+      {/* Voice Cloning Modal */}
+      <VoiceCloningModal
+        isOpen={showVoiceCloningModal}
+        onClose={() => setShowVoiceCloningModal(false)}
+        clonedVoices={appSettings.clonedVoices || []}
+        activeClonedVoiceId={appSettings.activeClonedVoiceId}
+        onSaveVoice={(newVoice: ClonedVoice) => {
+          const list = appSettings.clonedVoices || [];
+          const updated = [newVoice, ...list.filter(v => v.id !== newVoice.id)];
+          onSaveSettings({
+            ...appSettings,
+            clonedVoices: updated,
+            activeClonedVoiceId: newVoice.id,
+            ttsProvider: 'cloned_voice'
+          });
+          setTtsProvider('cloned_voice');
+          setTtsVoice(newVoice.id);
+        }}
+        onDeleteVoice={(id: string) => {
+          const list = appSettings.clonedVoices || [];
+          const updated = list.filter(v => v.id !== id);
+          onSaveSettings({
+            ...appSettings,
+            clonedVoices: updated,
+            activeClonedVoiceId: appSettings.activeClonedVoiceId === id ? (updated[0]?.id || '') : appSettings.activeClonedVoiceId
+          });
+          if (ttsVoice === id) {
+            setTtsVoice(updated[0]?.id || '');
+          }
+        }}
+        onSelectVoice={(id: string) => {
+          onSaveSettings({
+            ...appSettings,
+            activeClonedVoiceId: id,
+            ttsProvider: 'cloned_voice'
+          });
+          setTtsProvider('cloned_voice');
+          setTtsVoice(id);
+        }}
+      />
     </div>
   );
 };

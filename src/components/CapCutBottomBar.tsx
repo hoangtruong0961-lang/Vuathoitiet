@@ -68,7 +68,9 @@ import {
   TextOverlay,
   GlobalMovieContext,
   GlossaryEntity,
+  ClonedVoice,
 } from '../types';
+import { VoiceCloningModal } from './VoiceCloningModal';
 import { SUPPORTED_LANGUAGES } from '../data/sampleVideos';
 import { SubtitleStylingPanel } from './SubtitleStylingPanel';
 import { CustomColorPicker } from './CustomColorPicker';
@@ -308,8 +310,45 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
 
   // Subtitle Export & Audio Export States
   const [showSubtitleExportModal, setShowSubtitleExportModal] = useState<boolean>(false);
+  const [showVoiceCloningModal, setShowVoiceCloningModal] = useState<boolean>(false);
   const [isExportingAudio, setIsExportingAudio] = useState<boolean>(false);
   const [audioExportSuccess, setAudioExportSuccess] = useState<string | null>(null);
+
+  const handleSaveClonedVoice = (newVoice: ClonedVoice) => {
+    const list = appSettings.clonedVoices || [];
+    const updated = [newVoice, ...list.filter(v => v.id !== newVoice.id)];
+    onSaveSettings({
+      ...appSettings,
+      clonedVoices: updated,
+      activeClonedVoiceId: newVoice.id,
+      ttsProvider: 'cloned_voice'
+    });
+    setSelectedTtsProvider('cloned_voice');
+  };
+
+  const handleDeleteClonedVoice = (id: string) => {
+    const list = appSettings.clonedVoices || [];
+    const updated = list.filter(v => v.id !== id);
+    const nextActive = appSettings.activeClonedVoiceId === id ? (updated[0]?.id || '') : appSettings.activeClonedVoiceId;
+    onSaveSettings({
+      ...appSettings,
+      clonedVoices: updated,
+      activeClonedVoiceId: nextActive,
+      ttsProvider: updated.length === 0 && selectedTtsProvider === 'cloned_voice' ? 'vieneu_turbo' : selectedTtsProvider
+    });
+    if (updated.length === 0 && selectedTtsProvider === 'cloned_voice') {
+      setSelectedTtsProvider('vieneu_turbo');
+    }
+  };
+
+  const handleSelectClonedVoice = (id: string) => {
+    onSaveSettings({
+      ...appSettings,
+      activeClonedVoiceId: id,
+      ttsProvider: 'cloned_voice'
+    });
+    setSelectedTtsProvider('cloned_voice');
+  };
 
   const cleanProjectTitle = (projectTitle || 'capcut_project').replace(/\.\w+$/, '');
 
@@ -1908,6 +1947,9 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
                       }}
                       className="w-full bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer appearance-none pr-7"
                     >
+                      <option value="cloned_voice" className="bg-[#1e1e24] text-rose-300 font-bold">🎭 Nhân bản giọng nói (Voice Clone)</option>
+                      <option value="vieneu_turbo" className="bg-[#1e1e24] text-white">⚡ VieNeuTTS Turbo (Siêu Tốc)</option>
+                      <option value="vieneu_tts" className="bg-[#1e1e24] text-white">VieNeuTTS (Neural AI)</option>
                       <option value="capcut_tts" className="bg-[#1e1e24] text-white">CapCut TTS (Online)</option>
                       <option value="edge_tts" className="bg-[#1e1e24] text-white">Edge TTS (Online)</option>
                       <option value="tiktok_tts" className="bg-[#1e1e24] text-white">TikTok TTS (TikTok)</option>
@@ -1987,6 +2029,88 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
                           <option value="BV075_streaming_vibrato_dsp" className="bg-[#1e1e24] text-white">Việt Méo</option>
                         </optgroup>
                       </select>
+                    )}
+
+                    {/* Cloned Voices (User Voice Cloning) */}
+                    {selectedTtsProvider === 'cloned_voice' && (
+                      <div className="flex items-center gap-1.5 w-full">
+                        <select
+                          value={appSettings.activeClonedVoiceId || (appSettings.clonedVoices?.[0]?.id || '')}
+                          onChange={(e) => {
+                            if (e.target.value === '__new__') {
+                              setShowVoiceCloningModal(true);
+                            } else {
+                              handleSelectClonedVoice(e.target.value);
+                            }
+                          }}
+                          className="w-full bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer appearance-none pr-7"
+                        >
+                          {(appSettings.clonedVoices && appSettings.clonedVoices.length > 0) ? (
+                            <optgroup label="✨ Giọng của bạn" className="bg-[#1e1e24] text-sky-400 font-bold">
+                              {appSettings.clonedVoices.map((v) => (
+                                <option key={v.id} value={v.id} className="bg-[#1e1e24] text-white">
+                                  🎙️ {v.name} ({v.duration ? `${v.duration}s` : 'Mẫu'})
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : (
+                            <option value="" disabled className="bg-[#1e1e24] text-zinc-400">
+                              Chưa có giọng nào
+                            </option>
+                          )}
+                          <option value="__new__" className="bg-[#1e1e24] text-sky-300 font-bold">
+                            ➕ Thu âm / Tải mẫu mới...
+                          </option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowVoiceCloningModal(true)}
+                          className="shrink-0 px-2 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[11px] font-bold border border-sky-500/30 transition-colors"
+                          title="Quản lý thư viện giọng clone"
+                        >
+                          Quản lý
+                        </button>
+                      </div>
+                    )}
+
+                    {/* VieNeuTTS & VieNeuTTS Turbo Voices */}
+                    {(selectedTtsProvider === 'vieneu_tts' || selectedTtsProvider === 'vieneu_turbo') && (
+                      <div className="flex items-center gap-1.5 w-full">
+                        <select
+                          value={appSettings.vieneuVoice || 'Hải Đăng'}
+                          onChange={(e) => onSaveSettings({ ...appSettings, vieneuVoice: e.target.value })}
+                          className="w-full bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer appearance-none pr-7"
+                        >
+                        <optgroup label="⚡ VieNeu v3 Turbo" className="bg-[#1e1e24] text-sky-400 font-semibold">
+                          <option value="Hải Đăng" className="bg-[#1e1e24] text-white">🎙️ Hải Đăng (Nam · Bắc · Tự nhiên)</option>
+                          <option value="Mai Anh" className="bg-[#1e1e24] text-white">👩 Mai Anh (Nữ · Bắc · Tin tức)</option>
+                          <option value="Trúc Ly" className="bg-[#1e1e24] text-white">🌸 Trúc Ly (Nữ · Bắc · Tự nhiên)</option>
+                          <option value="Thùy Dung" className="bg-[#1e1e24] text-white">🎀 Thùy Dung (Nữ · Nam · Tin tức)</option>
+                          <option value="Ngọc Huyền" className="bg-[#1e1e24] text-white">✨ Ngọc Huyền (Nữ · Bắc · Đọc)</option>
+                          <option value="Quang Sơn" className="bg-[#1e1e24] text-white">⚡ Quang Sơn (Nam · Trung · Tự nhiên)</option>
+                          <option value="Ngọc Trân" className="bg-[#1e1e24] text-white">🌺 Ngọc Trân (Nữ · Trung · Tự nhiên)</option>
+                          <option value="Thiện Minh" className="bg-[#1e1e24] text-white">📖 Thiện Minh (Nam · Bắc · Kể chuyện)</option>
+                          <option value="Thiền Tâm Đức" className="bg-[#1e1e24] text-white">🧘 Thiền Tâm Đức (Nam · Kể chuyện)</option>
+                          <option value="Adam bựa" className="bg-[#1e1e24] text-white">🔥 Adam bựa (Nam · Bắc · Tự do)</option>
+                        </optgroup>
+                        <optgroup label="Dự phòng cũ" className="bg-[#1e1e24] text-slate-400">
+                          <option value="vi_female_north_1" className="bg-[#1e1e24] text-white">Cô Gái Miền Bắc (Legacy)</option>
+                          <option value="vi_female_south_1" className="bg-[#1e1e24] text-white">Cô Gái Miền Nam (Legacy)</option>
+                          <option value="vi_male_north_1" className="bg-[#1e1e24] text-white">Chàng Trai Miền Bắc (Legacy)</option>
+                          <option value="vi_male_south_1" className="bg-[#1e1e24] text-white">Chàng Trai Miền Nam (Legacy)</option>
+                          <option value="vi_female_central" className="bg-[#1e1e24] text-white">Cô Gái Miền Trung (Legacy)</option>
+                          <option value="vi_female_reading" className="bg-[#1e1e24] text-white">Giọng Đọc Truyện (Legacy)</option>
+                        </optgroup>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowVoiceCloningModal(true)}
+                        className="shrink-0 p-1.5 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 text-[11px] font-bold border border-sky-500/30 transition-colors"
+                        title="Tự nhập mẫu để nhân bản giọng (Voice Cloning)"
+                      >
+                        Clone
+                      </button>
+                    </div>
                     )}
 
                     {/* Piper TTS Voices */}
@@ -2140,7 +2264,13 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
                               ? (appSettings.edgeVoice || 'vi-VN-HoaiMyNeural')
                               : (selectedTtsProvider === 'nghi_tts'
                                   ? (appSettings.nghiVoice || 'lacphi')
-                                  : (appSettings.tiktokVoice || 'BV074_streaming')));
+                                  : (selectedTtsProvider === 'vieneu_tts' || selectedTtsProvider === 'vieneu_turbo'
+                                      ? (appSettings.vieneuVoice || 'Hải Đăng')
+                                      : (selectedTtsProvider === 'cloned_voice'
+                                          ? (appSettings.clonedVoices?.find(v => v.id === appSettings.activeClonedVoiceId)?.name || 'Giọng Clone')
+                                          : (selectedTtsProvider === 'gemini'
+                                              ? (appSettings.geminiVoice || 'Kore')
+                                              : (appSettings.tiktokVoice || 'BV074_streaming'))))));
                         try {
                           await onPlayTTS(sampleText, ttsSpeed, ttsPitch, selectedTtsProvider, activeVoice);
                         } finally {
@@ -4485,6 +4615,17 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
           <span>{audioExportSuccess}</span>
         </div>
       )}
+
+      {/* Voice Cloning Modal */}
+      <VoiceCloningModal
+        isOpen={showVoiceCloningModal}
+        onClose={() => setShowVoiceCloningModal(false)}
+        clonedVoices={appSettings.clonedVoices || []}
+        activeClonedVoiceId={appSettings.activeClonedVoiceId}
+        onSaveVoice={handleSaveClonedVoice}
+        onDeleteVoice={handleDeleteClonedVoice}
+        onSelectVoice={handleSelectClonedVoice}
+      />
     </>
   );
 };

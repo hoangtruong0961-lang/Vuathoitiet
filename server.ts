@@ -3424,6 +3424,214 @@ ${JSON.stringify(compactChunk)}`;
     return cleaned.trim();
   };
 
+  const generateVieNeuTTS = async (
+    text: string,
+    options: {
+      voice?: string;
+      rate?: number;
+      apiUrl?: string;
+      isTurbo?: boolean;
+      refAudioBase64?: string;
+      clonedVoiceName?: string;
+    }
+  ): Promise<{ audioBuffer: Buffer | null; displayName: string }> => {
+    const { voice = 'Hải Đăng', rate = 1.0, apiUrl, isTurbo = false, refAudioBase64, clonedVoiceName } = options;
+
+    // Resolve voice name between Turbo catalog & legacy IDs
+    const VOICE_NAME_MAP: Record<string, string> = {
+      vi_female_north_1: 'Mai Anh',
+      vi_female_south_1: 'Thùy Dung',
+      vi_male_north_1: 'Hải Đăng',
+      vi_male_south_1: 'Quang Sơn',
+      vi_female_central: 'Ngọc Trân',
+      vi_female_reading: 'Thiện Minh',
+    };
+    const turboVoice = VOICE_NAME_MAP[voice] || voice;
+
+    const isLocalUrl = (url: string) => url.includes('127.0.0.1') || url.includes('localhost');
+
+    const candidateUrls = [
+      apiUrl?.trim(),
+      'http://127.0.0.1:8000',
+      'http://localhost:8000',
+      'https://pnnbao-ump-vieneu-tts-v3-turbo.hf.space',
+      ...(isTurbo ? ['https://vieneu-vieneutts-turbo.hf.space', 'https://pylong-vieneutts-turbo.hf.space', 'https://vtranslate-vieneutts-turbo.hf.space'] : []),
+      'https://vieneu-vieneutts.hf.space',
+      'https://pylong-vieneutts.hf.space',
+      'https://vtranslate-vieneutts.hf.space'
+    ].filter(Boolean) as string[];
+
+    const label = refAudioBase64 ? `Giọng Clone (${clonedVoiceName || turboVoice})` : (isTurbo ? 'VieNeuTTS v3 Turbo' : 'VieNeuTTS');
+
+    for (const baseUrl of candidateUrls) {
+      try {
+        const cleanBase = baseUrl.replace(/\/+$/, '');
+        const isLocal = isLocalUrl(cleanBase);
+
+        // 1. Prioritize audio.cpp / OpenAI-compatible endpoint (/v1/audio/speech or /audio/speech or /tts)
+        try {
+          const endpointsToTry = cleanBase.endsWith('/v1')
+            ? [`${cleanBase}/audio/speech`, `${cleanBase}/tts`]
+            : [`${cleanBase}/v1/audio/speech`, `${cleanBase}/audio/speech`, `${cleanBase}/tts`];
+
+          for (const ep of endpointsToTry) {
+            try {
+              const oaiRes = await fetch(ep, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  model: 'vieneu_v3_turbo',
+                  input: text,
+                  voice: turboVoice,
+                  speed: rate,
+                  ref_audio_base64: refAudioBase64 || undefined
+                }),
+                signal: AbortSignal.timeout(isLocal ? 1500 : (isTurbo ? 5000 : 8000))
+              });
+              if (oaiRes.ok) {
+                const buf = Buffer.from(await oaiRes.arrayBuffer());
+                if (buf.length > 200) {
+                  const sourceTag = isLocal ? 'audio.cpp Local' : 'audio.cpp Server';
+                  return { audioBuffer: buf, displayName: `${label} ${sourceTag} (${turboVoice})` };
+                }
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+
+        // 2. Try Gradio 5 SSE protocol (/gradio_api/call/synthesize)
+        try {
+          let fileObj: any = null;
+          if (refAudioBase64) {
+            try {
+              const rawB64 = refAudioBase64.replace(/^data:audio\/[^;]+;base64,/, '');
+              const audioSampleBuf = Buffer.from(rawB64, 'base64');
+              const formData = new FormData();
+              formData.append('files', new Blob([audioSampleBuf], { type: 'audio/wav' }), 'clone_sample.wav');
+              const upRes = await fetch(`${cleanBase}/gradio_api/upload`, {
+                method: 'POST',
+                body: formData,
+                signal: AbortSignal.timeout(5000)
+              });
+              if (upRes.ok) {
+                const upJson = (await upRes.json()) as any;
+                if (Array.isArray(upJson) && upJson[0]) {
+                  fileObj = {
+                    path: upJson[0],
+                    url: `${cleanBase}/gradio_api/file=${upJson[0]}`,
+                    orig_name: 'clone_sample.wav',
+                    mime_type: 'audio/wav',
+                    meta: { _type: 'gradio.FileData' }
+                  };
+                }
+              }
+            } catch (_) {}
+          }
+
+          const callRes = await fetch(`${cleanBase}/gradio_api/call/synthesize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              data: [text, turboVoice, fileObj || null, 0.8, 25, 0.95, 1.2, 300, 256]
+            }),
+            signal: AbortSignal.timeout(isLocal ? 1000 : (isTurbo ? 5000 : 7000))
+          });
+
+          if (callRes.ok) {
+            const callJson = await callRes.json();
+            const eventId = callJson?.event_id;
+            if (eventId) {
+              const streamRes = await fetch(`${cleanBase}/gradio_api/call/synthesize/${eventId}`, {
+                signal: AbortSignal.timeout(isTurbo ? 7000 : 10000)
+              });
+              if (streamRes.ok) {
+                const sseText = await streamRes.text();
+                const lines = sseText.split('\n');
+                for (let i = 0; i < lines.length; i++) {
+                  if (lines[i].startsWith('data:')) {
+                    try {
+                      const payload = JSON.parse(lines[i].replace(/^data:\s*/, ''));
+                      if (Array.isArray(payload) && payload[0]?.url) {
+                        const fileUrl = payload[0].url.startsWith('http') ? payload[0].url : `${cleanBase}${payload[0].url}`;
+                        const audioRes = await fetch(fileUrl, { signal: AbortSignal.timeout(7000) });
+                        if (audioRes.ok) {
+                          const buf = Buffer.from(await audioRes.arrayBuffer());
+                          if (buf.length > 200) {
+                            return { audioBuffer: buf, displayName: `${label} HF Space (${turboVoice})` };
+                          }
+                        }
+                      }
+                    } catch (_) {}
+                  }
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        // 3. Try legacy Gradio /api/predict
+        const res = await fetch(`${cleanBase}/api/predict`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: [text, turboVoice, rate] }),
+          signal: AbortSignal.timeout(isTurbo ? 3500 : 6000)
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          if (json && json.data && json.data[0]) {
+            const item = json.data[0];
+            const audioUrl = typeof item === 'string' ? item : (item.name || item.url);
+            if (audioUrl) {
+              const fullUrl = audioUrl.startsWith('http') ? audioUrl : `${cleanBase}/file=${audioUrl}`;
+              const audioRes = await fetch(fullUrl, { signal: AbortSignal.timeout(isTurbo ? 4000 : 6000) });
+              if (audioRes.ok) {
+                const arrayBuf = await audioRes.arrayBuffer();
+                const buf = Buffer.from(arrayBuf);
+                if (buf.length > 200) {
+                  return { audioBuffer: buf, displayName: `${label} HF Space (${turboVoice})` };
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // High-Fidelity Neural Fallback mapping
+    const VIENEU_FALLBACK_MAP: Record<string, { voice: string; isMale: boolean; name: string }> = {
+      'Hải Đăng': { voice: 'BV075_streaming', isMale: true, name: 'Hải Đăng (Bắc)' },
+      'Mai Anh': { voice: 'multi_female_richgirl_uranus_bigtts', isMale: false, name: 'Mai Anh (Bắc)' },
+      'Trúc Ly': { voice: 'BV074_streaming', isMale: false, name: 'Trúc Ly (Bắc)' },
+      'Thùy Dung': { voice: 'BV074_streaming', isMale: false, name: 'Thùy Dung (Nam)' },
+      'Ngọc Huyền': { voice: 'BV562_streaming', isMale: false, name: 'Ngọc Huyền (Bắc)' },
+      'Quang Sơn': { voice: 'multi_male_felipe_uranus_bigtts', isMale: true, name: 'Quang Sơn (Trung)' },
+      'Ngọc Trân': { voice: 'BV562_streaming', isMale: false, name: 'Ngọc Trân (Trung)' },
+      'Thiện Minh': { voice: 'multi_male_felipe_uranus_bigtts', isMale: true, name: 'Thiện Minh (Kể chuyện)' },
+      'Thiền Tâm Đức': { voice: 'multi_male_felipe_uranus_bigtts', isMale: true, name: 'Thiền Tâm Đức' },
+      'Adam bựa': { voice: 'BV075_streaming', isMale: true, name: 'Adam bựa' },
+      vi_female_north_1: { voice: 'multi_female_richgirl_uranus_bigtts', isMale: false, name: 'Cô Gái Miền Bắc' },
+      vi_female_south_1: { voice: 'BV074_streaming', isMale: false, name: 'Cô Gái Miền Nam' },
+      vi_male_north_1: { voice: 'BV075_streaming', isMale: true, name: 'Chàng Trai Miền Bắc' },
+      vi_male_south_1: { voice: 'multi_male_felipe_uranus_bigtts', isMale: true, name: 'Chàng Trai Miền Nam' },
+      vi_female_central: { voice: 'BV562_streaming', isMale: false, name: 'Cô Gái Miền Trung' },
+      vi_female_reading: { voice: 'multi_female_daqi_uranus_bigtts', isMale: false, name: 'Giọng Đọc Truyện' }
+    };
+
+    const mapped = VIENEU_FALLBACK_MAP[turboVoice] || VIENEU_FALLBACK_MAP[voice] || { voice: 'BV074_streaming', isMale: false, name: turboVoice };
+
+    try {
+      const cRes = await generateCapCutTTS(text, { voice: mapped.voice, rate });
+      if (cRes.audioBuffer && cRes.audioBuffer.length > 200) {
+        return { audioBuffer: cRes.audioBuffer, displayName: `Dự phòng CapCut (${mapped.name}) [HF bận/Cần chạy Local]` };
+      }
+    } catch (_) {}
+
+    const mappedEdgeVoice = mapped.isMale ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
+    const edgeBuf = await fetchMsEdgeTTS(text, mappedEdgeVoice, rate);
+    return { audioBuffer: edgeBuf, displayName: `Dự phòng EdgeTTS (${mapped.name}) [HF bận]` };
+  };
+
   const generateTTSAudioHelper = async (options: {
     text: string;
     targetDuration?: number;
@@ -3434,6 +3642,10 @@ ${JSON.stringify(compactChunk)}`;
     tiktokSessionId?: string;
     tiktokVoice?: string;
     capcutVoice?: string;
+    vieneuVoice?: string;
+    vieneuApiUrl?: string;
+    clonedVoiceAudio?: string;
+    clonedVoiceName?: string;
     voice?: string;
     ttsSpeed?: number;
     apiMode?: string;
@@ -3460,6 +3672,10 @@ ${JSON.stringify(compactChunk)}`;
       tiktokSessionId = '',
       tiktokVoice = 'vi_001',
       capcutVoice = 'BV074_streaming',
+      vieneuVoice = 'Hải Đăng',
+      vieneuApiUrl = '',
+      clonedVoiceAudio = '',
+      clonedVoiceName = '',
       voice = 'Kore',
       ttsSpeed = 1.0,
       apiMode,
@@ -3478,9 +3694,6 @@ ${JSON.stringify(compactChunk)}`;
     const targetDur = Number(targetDuration || duration) || 0;
     let speed = Number(ttsSpeed) || 1.0;
 
-    // 3-Layer Sync Defense - Layer 2: Pre-calculate CPS and adjust TTS voice speed before audio generation
-    // BOUNDARY: NEVER slow down speech below user setting (min 0.95x) to eliminate robotic slow motion.
-    // When text is tight (high CPS), allow mild speedup capped strictly at 1.25x.
     if (enableAudioSync && targetDur && targetDur > 0.3) {
       const cps = cleanText.length / targetDur;
       if (cps > 14.0) {
@@ -3489,7 +3702,6 @@ ${JSON.stringify(compactChunk)}`;
           speed = Math.min(1.25, Math.round(speed * requiredSpeed * 100) / 100);
         }
       }
-      // Strictly bound speed: never drop below 0.95x (no dragging/slow motion), never exceed 1.25x (no chipmunk)
       speed = Math.max(0.95, Math.min(1.25, speed));
     }
     
@@ -3503,6 +3715,10 @@ ${JSON.stringify(compactChunk)}`;
       voiceKeyForCache = edgeVoice;
     } else if (provider === 'tiktok_tts') {
       voiceKeyForCache = tiktokVoice;
+    } else if (provider === 'vieneu_tts' || provider === 'vieneu_turbo') {
+      voiceKeyForCache = vieneuVoice;
+    } else if (provider === 'cloned_voice') {
+      voiceKeyForCache = `clone_${clonedVoiceName || voice || 'custom'}`;
     }
     
     const cacheKey = `${provider}:${voiceKeyForCache}:${speed}:${cleanText}`;
@@ -4061,6 +4277,81 @@ ${JSON.stringify(compactChunk)}`;
       }
     }
 
+    // Option E: VieNeuTTS (Neural AI)
+    else if (provider === 'vieneu_tts') {
+      const chosenVoice = options.vieneuVoice || options.voice || 'Hải Đăng';
+      try {
+        const vRes = await generateVieNeuTTS(cleanText, {
+          voice: chosenVoice,
+          rate: speed,
+          apiUrl: options.vieneuApiUrl
+        });
+        audioBuffer = vRes.audioBuffer;
+        if (audioBuffer && audioBuffer.length > 200) {
+          base64Audio = audioBuffer.toString('base64');
+          audioDuration = getMp3BufferDuration(audioBuffer);
+          actualProvider = vRes.displayName || `vieneu_tts (${chosenVoice})`;
+        }
+      } catch (vErr: any) {
+        console.warn('[VieNeuTTS Exception]', vErr?.message || vErr);
+      }
+      if (!base64Audio) {
+        throw new Error('Không thể tạo giọng đọc VieNeuTTS. Vui lòng thử lại hoặc chọn giọng đọc khác.');
+      }
+    }
+
+    // Option F: VieNeuTTS Turbo (Ultra-Fast Neural AI)
+    else if (provider === 'vieneu_turbo') {
+      const chosenVoice = options.vieneuVoice || options.voice || 'Hải Đăng';
+      try {
+        const vRes = await generateVieNeuTTS(cleanText, {
+          voice: chosenVoice,
+          rate: speed,
+          apiUrl: options.vieneuApiUrl,
+          refAudioBase64: options.clonedVoiceAudio,
+          clonedVoiceName: options.clonedVoiceName,
+          isTurbo: true
+        });
+        audioBuffer = vRes.audioBuffer;
+        if (audioBuffer && audioBuffer.length > 200) {
+          base64Audio = audioBuffer.toString('base64');
+          audioDuration = getMp3BufferDuration(audioBuffer);
+          actualProvider = vRes.displayName || `vieneu_turbo (${chosenVoice})`;
+        }
+      } catch (vErr: any) {
+        console.warn('[VieNeuTTS Turbo Exception]', vErr?.message || vErr);
+      }
+      if (!base64Audio) {
+        throw new Error('Không thể tạo giọng đọc VieNeuTTS Turbo. Vui lòng thử lại hoặc chọn giọng đọc khác.');
+      }
+    }
+
+    // Option G: Cloned Voice (VieNeu Instant Voice Cloning / Adaptive Timbre)
+    else if (provider === 'cloned_voice') {
+      const chosenVoice = options.clonedVoiceName || options.voice || 'Giọng Clone';
+      try {
+        const vRes = await generateVieNeuTTS(cleanText, {
+          voice: chosenVoice,
+          rate: speed,
+          apiUrl: options.vieneuApiUrl,
+          refAudioBase64: options.clonedVoiceAudio,
+          clonedVoiceName: chosenVoice,
+          isTurbo: true
+        });
+        audioBuffer = vRes.audioBuffer;
+        if (audioBuffer && audioBuffer.length > 200) {
+          base64Audio = audioBuffer.toString('base64');
+          audioDuration = getMp3BufferDuration(audioBuffer);
+          actualProvider = vRes.displayName || `cloned_voice (${chosenVoice})`;
+        }
+      } catch (cErr: any) {
+        console.warn('[Cloned Voice Exception]', cErr?.message || cErr);
+      }
+      if (!base64Audio) {
+        throw new Error('Không thể tạo giọng đọc nhân bản. Vui lòng kiểm tra file audio mẫu hoặc thử lại.');
+      }
+    }
+
     // Global Catch-all Fallback (Guarantees every requested voice delivers real speech)
     if (!base64Audio) {
       actualProvider = 'global_fallback';
@@ -4141,6 +4432,10 @@ ${JSON.stringify(compactChunk)}`;
         edgeVoice: req.body.edgeVoice,
         tiktokSessionId: req.body.tiktokSessionId,
         tiktokVoice: req.body.tiktokVoice,
+        vieneuVoice: req.body.vieneuVoice,
+        vieneuApiUrl: req.body.vieneuApiUrl,
+        clonedVoiceAudio: req.body.clonedVoiceAudio,
+        clonedVoiceName: req.body.clonedVoiceName,
         voice: req.body.voice,
         ttsSpeed: req.body.ttsSpeed,
         enableAudioSync: req.body.enableAudioSync !== false,
@@ -4489,6 +4784,10 @@ ${JSON.stringify(compactChunk)}`;
         edgeVoice = 'vi-VN-HoaiMyNeural',
         tiktokSessionId = '',
         tiktokVoice = 'vi_001',
+        vieneuVoice = 'Hải Đăng',
+        vieneuApiUrl = '',
+        clonedVoiceAudio = '',
+        clonedVoiceName = '',
         voice = 'Kore',
         ttsSpeed = 1.0,
       } = req.body;
@@ -4505,7 +4804,7 @@ ${JSON.stringify(compactChunk)}`;
       res.setHeader('Transfer-Encoding', 'chunked');
 
       let concurrencyLimit = 5;
-      if (provider === 'capcut_tts') {
+      if (provider === 'capcut_tts' || provider === 'vieneu_tts' || provider === 'cloned_voice') {
         concurrencyLimit = 3;
       } else if (provider === 'nghi_tts') {
         concurrencyLimit = 3;
@@ -4529,6 +4828,10 @@ ${JSON.stringify(compactChunk)}`;
             edgeVoice,
             tiktokSessionId,
             tiktokVoice,
+            vieneuVoice,
+            vieneuApiUrl,
+            clonedVoiceAudio,
+            clonedVoiceName,
             voice,
             ttsSpeed,
             enableAudioSync: req.body.enableAudioSync !== false,

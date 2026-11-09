@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(HardwareIdPlugin.class);
         registerPlugin(GeminiWebViewPlugin.class);
         registerPlugin(FFmpegKitPlugin.class);
+        registerPlugin(VieNeuAudioCppPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

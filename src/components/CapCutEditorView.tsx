@@ -52,6 +52,7 @@ import { HelpModal } from './HelpModal';
 import { ConfigView } from './ConfigView';
 import { ExportSettingsConfig } from '../types';
 import { Capacitor } from '@capacitor/core';
+import { VieNeuAudioCpp, isNativeVieNeuAvailable } from '../plugins/vieneuAudioCpp';
 
 interface CapCutEditorViewProps {
   project: Project;
@@ -2722,6 +2723,23 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
   ): Promise<string | null> => {
     try {
       const currentSettings = appSettingsRef.current || appSettings;
+      const activeClone = currentSettings.clonedVoices?.find(v => v.id === currentSettings.activeClonedVoiceId) || currentSettings.clonedVoices?.[0];
+
+      // Check native VieNeu audio.cpp on Capacitor Android first
+      if ((provider === 'vieneu_turbo' || provider === 'cloned_voice') && await isNativeVieNeuAvailable()) {
+        try {
+          const nativeRes = await VieNeuAudioCpp.synthesize({
+            text: textChunk,
+            voice: currentSettings.vieneuVoice || 'Hải Đăng',
+            speed,
+            refAudioBase64: activeClone?.audioBase64
+          });
+          if (nativeRes.success && nativeRes.base64Audio) {
+            return nativeRes.base64Audio;
+          }
+        } catch (_) {}
+      }
+
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2733,6 +2751,10 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
           edgeVoice: (provider === 'edge_tts' && voiceOverride) ? voiceOverride : (currentSettings.edgeVoice || 'vi-VN-HoaiMyNeural'),
           tiktokSessionId: currentSettings.tiktokSessionId,
           tiktokVoice: (provider === 'tiktok_tts' && voiceOverride) ? voiceOverride : (currentSettings.tiktokVoice || 'BV074_streaming'),
+          vieneuVoice: (provider === 'vieneu_turbo' || provider === 'vieneu_tts') && voiceOverride ? voiceOverride : (currentSettings.vieneuVoice || 'Hải Đăng'),
+          vieneuApiUrl: currentSettings.vieneuApiUrl || '',
+          clonedVoiceAudio: activeClone?.audioBase64 || '',
+          clonedVoiceName: activeClone?.name || (voiceOverride || 'Giọng Clone'),
           voice: currentSettings.geminiVoice || 'Kore',
           ttsSpeed: speed,
           enableAudioSync: currentSettings.enableAudioSync !== false,
@@ -2834,7 +2856,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
       if (ttsPipelineIdRef.current !== currentPipelineId) return;
       if (b64) {
         await playBase64AudioWithControls(b64, speed, pitch);
-      } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      } else if (provider === 'browser' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(chunks[0]);
         utterance.rate = Math.max(0.5, Math.min(2.0, speed));
         utterance.pitch = Math.max(0.5, Math.min(1.5, 1 + pitch / 10));
@@ -3006,6 +3028,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
 
         try {
           const currentSettings = appSettingsRef.current || appSettings;
+          const activeClone = currentSettings.clonedVoices?.find(v => v.id === currentSettings.activeClonedVoiceId) || currentSettings.clonedVoices?.[0];
           const res = await fetch('/api/tts/batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3017,6 +3040,10 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
               edgeVoice: currentSettings.edgeVoice || 'vi-VN-HoaiMyNeural',
               tiktokSessionId: currentSettings.tiktokSessionId,
               tiktokVoice: currentSettings.tiktokVoice || 'BV074_streaming',
+              vieneuVoice: currentSettings.vieneuVoice || 'Hải Đăng',
+              vieneuApiUrl: currentSettings.vieneuApiUrl || '',
+              clonedVoiceAudio: activeClone?.audioBase64 || '',
+              clonedVoiceName: activeClone?.name || 'Giọng Clone',
               voice: currentSettings.geminiVoice || 'Kore',
               ttsSpeed: currentSettings.ttsSpeed || 1.0,
               enableAudioSync: currentSettings.enableAudioSync !== false,
@@ -3143,6 +3170,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
 
     try {
       const currentSettings = appSettingsRef.current || appSettings;
+      const activeClone = currentSettings.clonedVoices?.find(v => v.id === currentSettings.activeClonedVoiceId) || currentSettings.clonedVoices?.[0];
       const res = await fetch('/api/tts/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3154,6 +3182,10 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
           edgeVoice: currentSettings.edgeVoice || 'vi-VN-HoaiMyNeural',
           tiktokSessionId: currentSettings.tiktokSessionId,
           tiktokVoice: currentSettings.tiktokVoice || 'BV074_streaming',
+          vieneuVoice: currentSettings.vieneuVoice || 'Hải Đăng',
+          vieneuApiUrl: currentSettings.vieneuApiUrl || '',
+          clonedVoiceAudio: activeClone?.audioBase64 || '',
+          clonedVoiceName: activeClone?.name || 'Giọng Clone',
           voice: currentSettings.geminiVoice || 'Kore',
           ttsSpeed: currentSettings.ttsSpeed || 1.0,
           apiMode: currentSettings?.apiMode,
