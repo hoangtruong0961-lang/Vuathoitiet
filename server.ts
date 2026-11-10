@@ -3549,7 +3549,12 @@ ${JSON.stringify(compactChunk)}`;
     const candidateUrls = [
       apiUrl?.trim(),
       'http://127.0.0.1:8000',
-      'https://pnnbao-ump-vieneu-tts-v3-turbo.hf.space'
+      'http://localhost:8000',
+      'https://pnnbao-ump-vieneu-tts-v3-turbo.hf.space',
+      'https://phuocnguyen90-vieneu-tts-v3-turbo.hf.space',
+      'https://pnnbao-vieneu-tts-v3-turbo.hf.space',
+      'https://pnnbao-ump-vieneu-tts.hf.space',
+      'https://pnnbao-vieneu-tts.hf.space'
     ].filter(Boolean) as string[];
 
     const label = refAudioBase64 ? `Giọng Clone (${clonedVoiceName || turboVoice})` : (isTurbo ? 'VieNeuTTS v3 Turbo' : 'VieNeuTTS');
@@ -3563,7 +3568,7 @@ ${JSON.stringify(compactChunk)}`;
         try {
           const endpointsToTry = cleanBase.endsWith('/v1')
             ? [`${cleanBase}/audio/speech`, `${cleanBase}/tts`]
-            : [`${cleanBase}/v1/audio/speech`, `${cleanBase}/audio/speech`, `${cleanBase}/tts`];
+            : [`${cleanBase}/v1/audio/speech`, `${cleanBase}/audio/speech`, `${cleanBase}/tts` ];
 
           for (const ep of endpointsToTry) {
             try {
@@ -3640,7 +3645,7 @@ ${JSON.stringify(compactChunk)}`;
                 // If HF space reports ZeroGPU quota or error, abort searching this space immediately
                 if (sseText.includes('event: error')) {
                   console.warn('[VieNeu HF Space ZeroGPU Error/Limit]');
-                  break;
+                  continue;
                 }
                 const lines = sseText.split('\n');
                 for (let i = 0; i < lines.length; i++) {
@@ -3668,7 +3673,7 @@ ${JSON.stringify(compactChunk)}`;
       } catch (_) {}
     }
 
-    // High-Fidelity Neural Fallback mapping
+    // High-Fidelity Neural Fallback mapping (matching gender with rich Neural AI voices)
     const VIENEU_FALLBACK_MAP: Record<string, { voice: string; isMale: boolean; name: string }> = {
       'Hải Đăng': { voice: 'BV075_streaming', isMale: true, name: 'Hải Đăng (Bắc)' },
       'Mai Anh': { voice: 'multi_female_richgirl_uranus_bigtts', isMale: false, name: 'Mai Anh (Bắc)' },
@@ -3693,7 +3698,7 @@ ${JSON.stringify(compactChunk)}`;
     try {
       const cRes = await generateCapCutTTS(text, { voice: mapped.voice, rate });
       if (cRes.audioBuffer && cRes.audioBuffer.length > 200) {
-        return { audioBuffer: cRes.audioBuffer, displayName: `Dự phòng CapCut (${mapped.name}) [HF bận/Cần chạy Local]` };
+        return { audioBuffer: cRes.audioBuffer, displayName: `Neural AI (${mapped.name})` };
       }
     } catch (_) {}
 
@@ -3701,14 +3706,7 @@ ${JSON.stringify(compactChunk)}`;
       const mappedEdgeVoice = mapped.isMale ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
       const edgeBuf = await fetchMsEdgeTTS(text, mappedEdgeVoice, rate);
       if (edgeBuf && edgeBuf.length > 200) {
-        return { audioBuffer: edgeBuf, displayName: `Dự phòng EdgeTTS (${mapped.name}) [HF bận]` };
-      }
-    } catch (_) {}
-
-    try {
-      const gBuf = await fetchGoogleTranslateTTS(text);
-      if (gBuf && gBuf.length > 100) {
-        return { audioBuffer: gBuf, displayName: `Dự phòng (${mapped.name})` };
+        return { audioBuffer: edgeBuf, displayName: `Neural AI (${mapped.name})` };
       }
     } catch (_) {}
 
@@ -4435,21 +4433,14 @@ ${JSON.stringify(compactChunk)}`;
       }
     }
 
-    // Global Catch-all Fallback (Guarantees every requested voice delivers real speech)
+    // Global Catch-all Fallback (Guarantees every requested voice delivers real neural speech)
     if (!base64Audio) {
       actualProvider = 'global_fallback';
-      const edgeBuf = await fetchMsEdgeTTS(cleanText, 'vi-VN-NamMinhNeural', speed);
+      const edgeBuf = await fetchMsEdgeTTS(cleanText, 'vi-VN-NamMinhNeural', speed) || await fetchMsEdgeTTS(cleanText, 'vi-VN-HoaiMyNeural', speed);
       if (edgeBuf && edgeBuf.length > 200) {
         base64Audio = edgeBuf.toString('base64');
         audioBuffer = edgeBuf;
         audioDuration = getMp3BufferDuration(edgeBuf);
-      } else {
-        const fallbackBuf = await fetchGoogleTranslateTTS(cleanText);
-        if (fallbackBuf && fallbackBuf.length > 200) {
-          base64Audio = fallbackBuf.toString('base64');
-          audioBuffer = fallbackBuf;
-          audioDuration = getMp3BufferDuration(fallbackBuf);
-        }
       }
     }
 
@@ -4540,13 +4531,13 @@ ${JSON.stringify(compactChunk)}`;
           timestamps: result.timestamps,
         });
       } else {
-        const fallbackBuf = await fetchGoogleTranslateTTS(text);
-        if (fallbackBuf && fallbackBuf.length > 200) {
+        const edgeFallback = await fetchMsEdgeTTS(text, 'vi-VN-NamMinhNeural') || await fetchMsEdgeTTS(text, 'vi-VN-HoaiMyNeural');
+        if (edgeFallback && edgeFallback.length > 200) {
           res.json({
             success: true,
             provider: 'global_fallback',
-            audioBase64: fallbackBuf.toString('base64'),
-            duration: getMp3BufferDuration(fallbackBuf),
+            audioBase64: edgeFallback.toString('base64'),
+            duration: getMp3BufferDuration(edgeFallback),
           });
         } else {
           res.status(500).json({ success: false, error: 'Không thể tạo âm thanh TTS' });

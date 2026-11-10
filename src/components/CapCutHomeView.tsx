@@ -110,7 +110,7 @@ export const CapCutHomeView: React.FC<CapCutHomeViewProps> = ({
           pitch: ttsPitch,
           clonedVoiceAudio: activeClone?.audioBase64 || '',
           clonedVoiceName: activeClone?.name || ttsVoice || 'Giọng Clone',
-          vieneuVoice: appSettings.vieneuVoice || 'Hải Đăng',
+          vieneuVoice: (ttsProvider === 'vieneu_turbo' || ttsProvider === 'vieneu_tts') ? ttsVoice : (appSettings.vieneuVoice || 'Hải Đăng'),
           vieneuApiUrl: appSettings.vieneuApiUrl || '',
         }),
       });
