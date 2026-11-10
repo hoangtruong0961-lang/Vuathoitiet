@@ -47,6 +47,7 @@ export interface VieNeuAudioCppPlugin {
   isAvailable(): Promise<VieNeuAudioCppStatus>;
   getEngineInfo(): Promise<VieNeuAudioCppEngineInfo>;
   loadModel(options?: { modelPath?: string }): Promise<{ success: boolean; modelPath?: string; error?: string }>;
+  downloadModel(): Promise<{ success: boolean; modelPath?: string; sizeBytes?: number; error?: string }>;
   synthesize(options: VieNeuSynthesizeOptions): Promise<VieNeuSynthesizeResult>;
 }
 
@@ -72,6 +73,9 @@ export const VieNeuAudioCpp = registerPlugin<VieNeuAudioCppPlugin>('VieNeuAudioC
       };
     },
     async loadModel() {
+      return { success: false, error: 'Chạy trực tiếp trên Web, sử dụng proxy audio.cpp' };
+    },
+    async downloadModel() {
       return { success: false, error: 'Chạy trực tiếp trên Web, sử dụng proxy audio.cpp' };
     },
     async synthesize() {

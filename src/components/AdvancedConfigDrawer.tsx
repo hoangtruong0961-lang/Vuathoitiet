@@ -762,47 +762,25 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-semibold text-purple-300 flex items-center gap-1.5">
                         <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
-                        <span>Tải Mô hình VieNeu-TTS v3 Turbo GGUF (Chính thức):</span>
+                        <span>Mô hình VieNeu-TTS v3 Turbo GGUF (Chính thức):</span>
                       </label>
                       <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded-full font-mono">VieNeu.cpp / audio.cpp</span>
                     </div>
 
-                    <div className="bg-[#14141c] border border-purple-950/70 p-2.5 rounded-xl space-y-2">
-                      <p className="text-[10.5px] text-slate-300 leading-relaxed font-medium">
-                        🔗 <strong>Link tải trực tiếp từ HuggingFace (phuocnguyen90):</strong>
-                      </p>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                        <a
-                          href="https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between bg-[#1c1c28] hover:bg-purple-900/30 border border-purple-800/50 px-2.5 py-1.5 rounded-lg text-[11px] text-purple-200 font-medium transition cursor-pointer group"
-                        >
-                          <span className="truncate">📦 model.gguf (~170MB)</span>
-                          <DownloadCloud className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform flex-shrink-0 ml-1" />
-                        </a>
-
-                        <a
-                          href="https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between bg-[#1c1c28] hover:bg-purple-900/30 border border-purple-800/50 px-2.5 py-1.5 rounded-lg text-[11px] text-purple-200 font-medium transition cursor-pointer group"
-                        >
-                          <span className="truncate">📄 tokenizer.json</span>
-                          <DownloadCloud className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform flex-shrink-0 ml-1" />
-                        </a>
-
-                        <a
-                          href="https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between bg-[#1c1c28] hover:bg-purple-900/30 border border-purple-800/50 px-2.5 py-1.5 rounded-lg text-[11px] text-purple-200 font-medium transition cursor-pointer group"
-                        >
-                          <span className="truncate">⚙️ tokenizer_config.json</span>
-                          <DownloadCloud className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform flex-shrink-0 ml-1" />
-                        </a>
+                    <div className="bg-[#14141c] border border-purple-950/70 p-3 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-xs font-medium text-slate-200">
+                        <span className="flex items-center gap-1.5">
+                          <span>📦 model.gguf + tokenizer</span>
+                          <span className="text-[10px] text-purple-400 font-mono">(~170.4 MB)</span>
+                        </span>
+                        <span className="text-[10px] bg-emerald-950/70 text-emerald-300 border border-emerald-800/60 px-2 py-0.5 rounded-md font-semibold">
+                          Tải Tự Động Vào App
+                        </span>
                       </div>
+
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Ứng dụng sẽ tự động tải 3 file mô hình (<span className="text-purple-300 font-mono">model.gguf</span>, <span className="text-purple-300 font-mono">tokenizer.json</span>, <span className="text-purple-300 font-mono">tokenizer_config.json</span>) thẳng vào bộ nhớ ứng dụng / server để phát thuyết minh Offline siêu tốc giống Piper TTS / Sherpa-ONNX.
+                      </p>
                     </div>
 
                     <div className="pt-1">
@@ -815,7 +793,7 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
                         className="w-full bg-[#16161e] border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-600"
                       />
                       <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                        💡 <strong>Hướng dẫn sử dụng:</strong> Tải 3 file trên thả vào thư mục <span className="text-purple-300 font-mono">models/</span> của máy tính chạy <span className="text-purple-300 font-mono">audio.cpp</span> hoặc ứng dụng Android APK để phát thuyết minh VieNeu Turbo siêu tốc offline.
+                        💡 <strong>Hoạt động:</strong> App tự tải mô hình vào lưu trữ local và khởi tạo tầng C++ phát âm thanh trực tiếp trên thiết bị/server.
                       </p>
                     </div>
                   </div>

@@ -114,7 +114,7 @@ public class VieNeuAudioCppPlugin extends Plugin {
         if (!modelFile.exists()) {
             JSObject res = new JSObject();
             res.put("success", false);
-            res.put("error", "Model file not found: " + modelFile.getAbsolutePath() + ". Vui lòng tải file vieneu_v3_turbo.gguf hoặc dùng server audio.cpp.");
+            res.put("error", "Model file not found: " + modelFile.getAbsolutePath() + ". Đang tự động tải mô hình vieneu_v3_turbo.gguf...");
             call.resolve(res);
             return;
         }
@@ -140,6 +140,64 @@ public class VieNeuAudioCppPlugin extends Plugin {
             Log.e(TAG, "nativeInitModel error", t);
             call.reject("Failed to initialize native model: " + t.getMessage());
         }
+    }
+
+    @PluginMethod
+    public void downloadModel(PluginCall call) {
+        new Thread(() -> {
+            try {
+                File modelDir = new File(getContext().getFilesDir(), "models");
+                if (!modelDir.exists()) {
+                    modelDir.mkdirs();
+                }
+                File modelFile = new File(modelDir, "vieneu_v3_turbo.gguf");
+
+                String modelUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true";
+                Log.i(TAG, "Downloading VieNeu Turbo GGUF model from " + modelUrl);
+
+                java.net.URL url = new java.net.URL(modelUrl);
+                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                conn.setInstanceFollowRedirects(true);
+                conn.connect();
+
+                if (conn.getResponseCode() != java.net.HttpURLConnection.HTTP_OK) {
+                    JSObject res = new JSObject();
+                    res.put("success", false);
+                    res.put("error", "HTTP " + conn.getResponseCode() + " when downloading model");
+                    call.resolve(res);
+                    return;
+                }
+
+                InputStream input = conn.getInputStream();
+                FileOutputStream output = new FileOutputStream(modelFile);
+                byte[] data = new byte[16384];
+                int count;
+                long total = 0;
+
+                while ((count = input.read(data)) != -1) {
+                    output.write(data, 0, count);
+                    total += count;
+                }
+
+                output.flush();
+                output.close();
+                input.close();
+
+                Log.i(TAG, "VieNeu Turbo model downloaded successfully: " + total + " bytes");
+
+                JSObject res = new JSObject();
+                res.put("success", true);
+                res.put("modelPath", modelFile.getAbsolutePath());
+                res.put("sizeBytes", total);
+                call.resolve(res);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to download model", e);
+                JSObject res = new JSObject();
+                res.put("success", false);
+                res.put("error", e.getMessage());
+                call.resolve(res);
+            }
+        }).start();
     }
 
     @PluginMethod

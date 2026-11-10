@@ -78,6 +78,8 @@ import { wrapSubtitleText, parseSRT, exportToSRT, exportToASS, exportToVTT, expo
 import { generateVoiceoverWav } from '../utils/audioExporter';
 import { cleanTranslatedSubtitleText } from '../utils/subtitleCleaner';
 import { resolveApiUrl } from '../utils/apiUrl';
+import { Capacitor } from '@capacitor/core';
+import { VieNeuAudioCpp } from '../plugins/vieneuAudioCpp';
 
 interface CapCutBottomBarProps {
   activeTab: CapCutTab | null;
@@ -1002,6 +1004,65 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
       checkNghiStatus(appSettings.nghiVoice || 'lacphi', true);
     }
   }, [selectedTtsProvider, appSettings.nghiVoice]);
+
+  // VieNeu TTS Turbo download & status management
+  const [vieneuStatus, setVieneuStatus] = useState<{ ready: boolean; modelSizeMb: number } | null>(null);
+  const [isDownloadingVieneu, setIsDownloadingVieneu] = useState(false);
+  const [vieneuDownloadMsg, setVieneuDownloadMsg] = useState('');
+
+  const checkVieNeuStatus = async () => {
+    try {
+      const res = await fetch(resolveApiUrl('/api/tts/vieneu-status'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setVieneuStatus(data);
+      }
+    } catch (e) {
+      console.warn('Check VieNeu status error:', e);
+    }
+  };
+
+  const handleDownloadVieNeuModel = async () => {
+    setIsDownloadingVieneu(true);
+    setVieneuDownloadMsg('⏳ Đang tự động tải mô hình VieNeu Turbo GGUF (170MB)... Vui lòng đợi trong giây lát!');
+    try {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const nativeRes = await VieNeuAudioCpp.downloadModel();
+          if (nativeRes.success) {
+            setVieneuDownloadMsg('✓ Đã tải xong mô hình VieNeu Turbo vào bộ nhớ ứng dụng!');
+            await checkVieNeuStatus();
+            return;
+          }
+        } catch (_) {}
+      }
+
+      const res = await fetch(resolveApiUrl('/api/tts/vieneu-download'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setVieneuDownloadMsg(`✓ ${data.message || 'Đã tải xong mô hình VieNeu Turbo!'}`);
+        await checkVieNeuStatus();
+      } else {
+        setVieneuDownloadMsg(`❌ Lỗi tải: ${data.error || 'Không xác định'}`);
+      }
+    } catch (e: any) {
+      setVieneuDownloadMsg(`❌ Lỗi kết nối: ${e.message}`);
+    } finally {
+      setIsDownloadingVieneu(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (selectedTtsProvider === 'vieneu_turbo' || selectedTtsProvider === 'vieneu_tts') {
+      checkVieNeuStatus();
+    }
+  }, [selectedTtsProvider]);
 
   // Subtitle block edit panel popups
   const [showTextEditor, setShowTextEditor] = useState<boolean>(false);
@@ -2228,6 +2289,31 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
                           >
                             <Loader2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span>Click để tải giọng về</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {(selectedTtsProvider === 'vieneu_turbo' || selectedTtsProvider === 'vieneu_tts') && (
+                      <div className="mt-2">
+                        {isDownloadingVieneu ? (
+                          <div className="flex items-center space-x-2 bg-purple-950/80 border border-purple-500/50 p-2 rounded-xl text-purple-200 text-xs font-semibold animate-pulse">
+                            <Loader2 className="w-4 h-4 animate-spin text-purple-400 shrink-0" />
+                            <span>{vieneuDownloadMsg || `Đang tự động tải mô hình VieNeu Turbo...`}</span>
+                          </div>
+                        ) : vieneuStatus?.ready ? (
+                          <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>Mô hình VieNeu Turbo ({vieneuStatus.modelSizeMb} MB) đã sẵn sàng</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleDownloadVieNeuModel}
+                            className="w-full flex items-center justify-center space-x-1.5 text-xs font-semibold text-purple-200 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <span>Tự động tải mô hình VieNeu Turbo (170MB) vào App</span>
                           </button>
                         )}
                       </div>
