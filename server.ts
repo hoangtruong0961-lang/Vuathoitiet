@@ -2563,24 +2563,31 @@ ${JSON.stringify(compactChunk)}`;
     }
   });
 
-  // Constant URLs for VieNeu-TTS v3 Turbo GGUF model files (Hugging Face official repository)
+  // Constant URLs for VieNeu-TTS v3 Turbo GGUF model files (official audio.cpp structure from phuocnguyen90)
   const VIENEU_TURBO_MODEL_URLS = {
     modelGguf: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true',
+    config: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/config.json?download=true',
     tokenizer: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true',
     tokenizerConfig: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true',
+    specialTokensMap: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/special_tokens_map.json?download=true',
+    speechTokenizerConfig: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/speech_tokenizer/config.json?download=true',
   };
 
   // 7. VieNeu Turbo GGUF Status Endpoint
   app.post('/api/tts/vieneu-status', async (_req, res) => {
     try {
-      const vieneuDir = path.join(process.cwd(), 'vieneu-tts-turbo');
-      const modelPath = path.join(vieneuDir, 'model.gguf');
-      const tokenizerPath = path.join(vieneuDir, 'tokenizer.json');
-      const tokenizerConfigPath = path.join(vieneuDir, 'tokenizer_config.json');
+      const audioCppModelDir = path.join(process.cwd(), 'models', 'VieNeu-TTS-v3-Turbo');
+      const legacyDir = path.join(process.cwd(), 'vieneu-tts-turbo');
+
+      const modelPath = fs.existsSync(path.join(audioCppModelDir, 'model.gguf'))
+        ? path.join(audioCppModelDir, 'model.gguf')
+        : path.join(legacyDir, 'model.gguf');
+      const tokenizerPath = path.join(audioCppModelDir, 'tokenizer.json');
+      const speechTokenizerConfigPath = path.join(audioCppModelDir, 'speech_tokenizer', 'config.json');
 
       const modelExists = fs.existsSync(modelPath) && fs.statSync(modelPath).size > 1000000;
-      const tokenizerExists = fs.existsSync(tokenizerPath) && fs.statSync(tokenizerPath).size > 100;
-      const tokenizerConfigExists = fs.existsSync(tokenizerConfigPath) && fs.statSync(tokenizerConfigPath).size > 10;
+      const tokenizerExists = fs.existsSync(tokenizerPath) && fs.statSync(tokenizerPath).size > 50;
+      const speechTokenizerExists = fs.existsSync(speechTokenizerConfigPath);
 
       let modelSizeMb = 0;
       if (modelExists) {
@@ -2590,53 +2597,60 @@ ${JSON.stringify(compactChunk)}`;
       res.json({
         success: true,
         urls: VIENEU_TURBO_MODEL_URLS,
-        ready: modelExists && tokenizerExists && tokenizerConfigExists,
+        ready: modelExists,
         modelExists,
         tokenizerExists,
-        tokenizerConfigExists,
+        speechTokenizerExists,
         modelSizeMb,
+        modelDir: audioCppModelDir,
       });
     } catch (e: any) {
       res.status(500).json({ success: false, error: e.message });
     }
   });
 
-  // 8. VieNeu Turbo GGUF Download Endpoint
+  // 8. VieNeu Turbo GGUF Download Endpoint (Official audio.cpp structure)
   app.post('/api/tts/vieneu-download', async (_req, res) => {
     try {
-      const vieneuDir = path.join(process.cwd(), 'vieneu-tts-turbo');
-      fs.mkdirSync(vieneuDir, { recursive: true });
+      const audioCppModelDir = path.join(process.cwd(), 'models', 'VieNeu-TTS-v3-Turbo');
+      const speechTokenizerDir = path.join(audioCppModelDir, 'speech_tokenizer');
+      fs.mkdirSync(speechTokenizerDir, { recursive: true });
 
-      const modelPath = path.join(vieneuDir, 'model.gguf');
-      const tokenizerPath = path.join(vieneuDir, 'tokenizer.json');
-      const tokenizerConfigPath = path.join(vieneuDir, 'tokenizer_config.json');
+      console.log('[VieNeu Turbo Download] Downloading complete audio.cpp VieNeu-TTS-v3-Turbo model package from Hugging Face...');
 
-      console.log('[VieNeu Turbo Download] Downloading VieNeu v3 Turbo GGUF files from Hugging Face...');
+      // 1. Auxiliary JSON config & tokenizer files
+      await Promise.all([
+        ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.config, path.join(audioCppModelDir, 'config.json'), 10),
+        ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.tokenizer, path.join(audioCppModelDir, 'tokenizer.json'), 50),
+        ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.tokenizerConfig, path.join(audioCppModelDir, 'tokenizer_config.json'), 10),
+        ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.specialTokensMap, path.join(audioCppModelDir, 'special_tokens_map.json'), 10),
+        ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.speechTokenizerConfig, path.join(speechTokenizerDir, 'config.json'), 10),
+      ]);
 
-      const okTokenizer = await ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.tokenizer, tokenizerPath, 50);
-      if (!okTokenizer) {
-        res.status(500).json({ success: false, error: 'Không thể tải file tokenizer.json' });
-        return;
-      }
-
-      const okConfig = await ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.tokenizerConfig, tokenizerConfigPath, 10);
-      if (!okConfig) {
-        res.status(500).json({ success: false, error: 'Không thể tải file tokenizer_config.json' });
-        return;
-      }
-
+      // 2. Main weights GGUF model (~170.4 MB)
+      const modelPath = path.join(audioCppModelDir, 'model.gguf');
       const okModel = await ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.modelGguf, modelPath, 10000000);
       if (!okModel) {
         res.status(500).json({ success: false, error: 'Không thể tải file model.gguf' });
         return;
       }
 
+      // Link to legacy paths for compatibility
+      try {
+        const legacyDir = path.join(process.cwd(), 'vieneu-tts-turbo');
+        fs.mkdirSync(legacyDir, { recursive: true });
+        if (!fs.existsSync(path.join(legacyDir, 'model.gguf'))) {
+          fs.copyFileSync(modelPath, path.join(legacyDir, 'model.gguf'));
+        }
+      } catch (_) {}
+
       const sizeMb = Math.round((fs.statSync(modelPath).size / (1024 * 1024)) * 10) / 10;
 
       res.json({
         success: true,
-        message: `Đã tải thành công mô hình VieNeu-TTS v3 Turbo GGUF (${sizeMb} MB) và tokenizer!`,
+        message: `Đã tải đầy đủ gói mô hình VieNeu-TTS v3 Turbo GGUF (${sizeMb} MB) theo chuẩn audio.cpp!`,
         sizeMb,
+        modelDir: audioCppModelDir,
         urls: VIENEU_TURBO_MODEL_URLS,
       });
     } catch (e: any) {

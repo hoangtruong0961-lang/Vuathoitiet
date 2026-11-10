@@ -1008,16 +1008,34 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
   // VieNeu TTS Turbo download & status management
   const [vieneuStatus, setVieneuStatus] = useState<{ ready: boolean; modelSizeMb: number } | null>(null);
   const [isDownloadingVieneu, setIsDownloadingVieneu] = useState(false);
+  const [vieneuDownloadProgress, setVieneuDownloadProgress] = useState<number | null>(null);
   const [vieneuDownloadMsg, setVieneuDownloadMsg] = useState('');
 
   const checkVieNeuStatus = async () => {
     try {
+      // 1. On Android Native APK, check internal device storage models first!
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const nativeStatus = await VieNeuAudioCpp.isAvailable();
+          if (nativeStatus && (nativeStatus.modelExistsOnDisk || nativeStatus.ready)) {
+            const sizeMb = nativeStatus.modelSizeMb || Math.round(((nativeStatus.modelSize || 0) / (1024 * 1024)) * 10) / 10;
+            setVieneuStatus({ ready: true, modelSizeMb: sizeMb || 170.4 });
+            return;
+          }
+        } catch (e) {
+          console.warn('[VieNeu Native] isAvailable error:', e);
+        }
+      }
+
+      // 2. Also check backend server status
       const res = await fetch(resolveApiUrl('/api/tts/vieneu-status'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
       const data = await res.json().catch(() => ({}));
-      if (data.success) {
+      if (data.success && data.ready) {
+        setVieneuStatus(data);
+      } else if (data.success) {
         setVieneuStatus(data);
       }
     } catch (e) {
@@ -1027,19 +1045,42 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
 
   const handleDownloadVieNeuModel = async () => {
     setIsDownloadingVieneu(true);
-    setVieneuDownloadMsg('⏳ Đang tự động tải mô hình VieNeu Turbo GGUF (170MB)... Vui lòng đợi trong giây lát!');
+    setVieneuDownloadProgress(0);
+    setVieneuDownloadMsg('⏳ Đang chuẩn bị tải mô hình VieNeu Turbo GGUF (170MB)...');
+
+    let removeListener: (() => void) | null = null;
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const handle = await (VieNeuAudioCpp as any).addListener('vieneuDownloadProgress', (data: any) => {
+          if (data && typeof data.percent === 'number' && data.percent >= 0) {
+            setVieneuDownloadProgress(data.percent);
+            const downloadedMb = Math.round(((data.downloadedBytes || 0) / (1024 * 1024)) * 10) / 10;
+            const totalMb = Math.round(((data.totalBytes || 0) / (1024 * 1024)) * 10) / 10;
+            setVieneuDownloadMsg(`⏳ Đang tải mô hình vào App: ${data.percent}% (${downloadedMb}/${totalMb || 170.4} MB)`);
+          }
+        });
+        removeListener = () => handle.remove();
+      } catch (_) {}
+    }
+
     try {
       if (Capacitor.isNativePlatform()) {
-        try {
-          const nativeRes = await VieNeuAudioCpp.downloadModel();
-          if (nativeRes.success) {
-            setVieneuDownloadMsg('✓ Đã tải xong mô hình VieNeu Turbo vào bộ nhớ ứng dụng!');
-            await checkVieNeuStatus();
-            return;
-          }
-        } catch (_) {}
+        setVieneuDownloadMsg('⏳ Đang tải trực tiếp mô hình VieNeu Turbo (170MB) vào bộ nhớ điện thoại...');
+        const nativeRes = await VieNeuAudioCpp.downloadModel();
+        if (nativeRes && nativeRes.success) {
+          setVieneuDownloadMsg('✓ Đã tải xong mô hình VieNeu Turbo vào bộ nhớ điện thoại!');
+          setVieneuStatus({ ready: true, modelSizeMb: (nativeRes as any).sizeMb || 170.4 });
+          await checkVieNeuStatus();
+          return;
+        } else {
+          const err = (nativeRes as any)?.error || 'Lỗi không xác định khi tải trên điện thoại';
+          setVieneuDownloadMsg(`❌ Lỗi tải vào APK: ${err}`);
+          return;
+        }
       }
 
+      // Web/Cloud environment fallback: download to backend server
+      setVieneuDownloadMsg('⏳ Đang tải mô hình VieNeu Turbo vào máy chủ...');
       const res = await fetch(resolveApiUrl('/api/tts/vieneu-download'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1054,6 +1095,9 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
     } catch (e: any) {
       setVieneuDownloadMsg(`❌ Lỗi kết nối: ${e.message}`);
     } finally {
+      if (removeListener) {
+        try { removeListener(); } catch (_) {}
+      }
       setIsDownloadingVieneu(false);
     }
   };
@@ -2295,26 +2339,42 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
                     )}
 
                     {(selectedTtsProvider === 'vieneu_turbo' || selectedTtsProvider === 'vieneu_tts') && (
-                      <div className="mt-2">
+                      <div className="mt-2 space-y-1.5">
                         {isDownloadingVieneu ? (
-                          <div className="flex items-center space-x-2 bg-purple-950/80 border border-purple-500/50 p-2 rounded-xl text-purple-200 text-xs font-semibold animate-pulse">
-                            <Loader2 className="w-4 h-4 animate-spin text-purple-400 shrink-0" />
-                            <span>{vieneuDownloadMsg || `Đang tự động tải mô hình VieNeu Turbo...`}</span>
+                          <div className="bg-purple-950/80 border border-purple-500/50 p-2.5 rounded-xl text-purple-200 text-xs font-semibold animate-pulse space-y-1.5">
+                            <div className="flex items-center space-x-2">
+                              <Loader2 className="w-4 h-4 animate-spin text-purple-400 shrink-0" />
+                              <span className="truncate">{vieneuDownloadMsg || `Đang tự động tải mô hình VieNeu Turbo...`}</span>
+                            </div>
+                            {typeof vieneuDownloadProgress === 'number' && vieneuDownloadProgress > 0 && (
+                              <div className="w-full bg-purple-900/60 rounded-full h-1.5 overflow-hidden">
+                                <div
+                                  className="bg-purple-400 h-1.5 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, vieneuDownloadProgress)}%` }}
+                                />
+                              </div>
+                            )}
                           </div>
                         ) : vieneuStatus?.ready ? (
-                          <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+                          <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1.5 rounded-xl">
                             <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                            <span>Mô hình VieNeu Turbo ({vieneuStatus.modelSizeMb} MB) đã sẵn sàng</span>
+                            <span>Mô hình VieNeu Turbo ({vieneuStatus.modelSizeMb} MB) đã sẵn sàng trong App</span>
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={handleDownloadVieNeuModel}
-                            className="w-full flex items-center justify-center space-x-1.5 text-xs font-semibold text-purple-200 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 px-2.5 py-1.5 rounded-xl transition cursor-pointer"
+                            className="w-full flex items-center justify-center space-x-1.5 text-xs font-semibold text-purple-200 bg-purple-950/60 hover:bg-purple-900/80 border border-purple-500/40 px-2.5 py-2 rounded-xl transition cursor-pointer"
                           >
                             <Download className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                             <span>Tự động tải mô hình VieNeu Turbo (170MB) vào App</span>
                           </button>
+                        )}
+
+                        {!isDownloadingVieneu && !vieneuStatus?.ready && vieneuDownloadMsg && (vieneuDownloadMsg.startsWith('❌') || vieneuDownloadMsg.includes('Lỗi')) && (
+                          <div className="text-[11px] text-rose-300 bg-rose-950/60 border border-rose-800/50 px-2.5 py-1.5 rounded-xl leading-relaxed">
+                            {vieneuDownloadMsg}
+                          </div>
                         )}
                       </div>
                     )}

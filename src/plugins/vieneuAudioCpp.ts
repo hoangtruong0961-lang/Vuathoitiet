@@ -2,8 +2,11 @@ import { registerPlugin, Capacitor } from '@capacitor/core';
 
 export const VIENEU_TURBO_HF_URLS = {
   modelGguf: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true',
+  config: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/config.json?download=true',
   tokenizer: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true',
   tokenizerConfig: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true',
+  specialTokensMap: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/special_tokens_map.json?download=true',
+  speechTokenizerConfig: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/speech_tokenizer/config.json?download=true',
 };
 
 export interface VieNeuAudioCppStatus {
@@ -12,8 +15,10 @@ export interface VieNeuAudioCppStatus {
   engine: string;
   modelFormat: string;
   modelExistsOnDisk: boolean;
+  ready?: boolean;
   modelPath?: string;
   modelSize?: number;
+  modelSizeMb?: number;
 }
 
 export interface VieNeuAudioCppEngineInfo {
@@ -91,7 +96,15 @@ export async function isNativeVieNeuAvailable(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) return false;
   try {
     const status = await VieNeuAudioCpp.isAvailable();
-    return Boolean(status.isNativeLibraryLoaded && status.isModelInitialized);
+    if (!status.isNativeLibraryLoaded) return false;
+    if (status.isModelInitialized) return true;
+    if (status.modelExistsOnDisk || status.ready) {
+      try {
+        const loadRes = await VieNeuAudioCpp.loadModel({ modelPath: status.modelPath });
+        return Boolean(loadRes && loadRes.success);
+      } catch (_) {}
+    }
+    return false;
   } catch {
     return false;
   }

@@ -12,6 +12,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 @CapacitorPlugin(name = "VieNeuAudioCpp")
 public class VieNeuAudioCppPlugin extends Plugin {
@@ -43,6 +46,61 @@ public class VieNeuAudioCppPlugin extends Plugin {
     private static native byte[] nativeSynthesize(String text, String voice, float speed, byte[] refAudioBytes);
     private static native void nativeRelease();
 
+    private HttpURLConnection openConnectionWithRedirects(String urlStr) throws Exception {
+        int redirects = 0;
+        while (redirects < 10) {
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14)");
+            conn.setRequestProperty("Accept", "*/*");
+            conn.setConnectTimeout(30000);
+            conn.setReadTimeout(60000);
+            int code = conn.getResponseCode();
+            if (code == HttpURLConnection.HTTP_MOVED_TEMP || 
+                code == HttpURLConnection.HTTP_MOVED_PERM || 
+                code == 307 || 
+                code == 308 ||
+                code == 303) {
+                String location = conn.getHeaderField("Location");
+                conn.disconnect();
+                if (location != null && !location.isEmpty()) {
+                    if (!location.startsWith("http://") && !location.startsWith("https://")) {
+                        location = new URL(url, location).toString();
+                    }
+                    Log.i(TAG, "Redirect " + code + " -> " + location);
+                    urlStr = location;
+                    redirects++;
+                    continue;
+                }
+            }
+            return conn;
+        }
+        throw new IOException("Too many redirects: " + urlStr);
+    }
+
+    private void downloadSingleFile(String urlStr, File destFile) {
+        try {
+            HttpURLConnection conn = openConnectionWithRedirects(urlStr);
+            if (conn.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                InputStream in = conn.getInputStream();
+                FileOutputStream out = new FileOutputStream(destFile);
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) != -1) {
+                    out.write(buf, 0, r);
+                }
+                out.flush();
+                out.close();
+                in.close();
+                Log.i(TAG, "Downloaded " + destFile.getName() + " (" + destFile.length() + " bytes)");
+            }
+            conn.disconnect();
+        } catch (Throwable t) {
+            Log.w(TAG, "Failed downloading " + destFile.getName() + ": " + t.getMessage());
+        }
+    }
+
     @PluginMethod
     public void isAvailable(PluginCall call) {
         JSObject ret = new JSObject();
@@ -51,11 +109,26 @@ public class VieNeuAudioCppPlugin extends Plugin {
         ret.put("engine", "audio.cpp (ggml)");
         ret.put("modelFormat", "GGUF Q4_K/Q8_0");
 
+        File turboModel = new File(getContext().getFilesDir(), "models/VieNeu-TTS-v3-Turbo/model.gguf");
         File defaultModel = new File(getContext().getFilesDir(), "models/vieneu_v3_turbo.gguf");
-        ret.put("modelExistsOnDisk", defaultModel.exists());
-        if (defaultModel.exists()) {
-            ret.put("modelPath", defaultModel.getAbsolutePath());
-            ret.put("modelSize", defaultModel.length());
+        File altModel = new File(getContext().getFilesDir(), "models/model.gguf");
+        File foundModel = null;
+        if (turboModel.exists() && turboModel.length() > 10000000) {
+            foundModel = turboModel;
+        } else if (defaultModel.exists() && defaultModel.length() > 10000000) {
+            foundModel = defaultModel;
+        } else if (altModel.exists() && altModel.length() > 10000000) {
+            foundModel = altModel;
+        }
+
+        boolean exists = (foundModel != null);
+        ret.put("modelExistsOnDisk", exists);
+        ret.put("ready", exists);
+        if (exists) {
+            ret.put("modelPath", foundModel.getAbsolutePath());
+            ret.put("modelSize", foundModel.length());
+            double mb = Math.round((foundModel.length() / (1024.0 * 1024.0)) * 10.0) / 10.0;
+            ret.put("modelSizeMb", mb);
         }
 
         call.resolve(ret);
@@ -89,7 +162,18 @@ public class VieNeuAudioCppPlugin extends Plugin {
             if (!modelDir.exists()) {
                 modelDir.mkdirs();
             }
-            modelFile = new File(modelDir, "vieneu_v3_turbo.gguf");
+            File turboModel = new File(modelDir, "VieNeu-TTS-v3-Turbo/model.gguf");
+            if (turboModel.exists() && turboModel.length() > 10000000) {
+                modelFile = turboModel;
+            } else {
+                modelFile = new File(modelDir, "vieneu_v3_turbo.gguf");
+                if (!modelFile.exists() || modelFile.length() < 10000000) {
+                    File alt = new File(modelDir, "model.gguf");
+                    if (alt.exists() && alt.length() > 10000000) {
+                        modelFile = alt;
+                    }
+                }
+            }
 
             // If not found in internal storage, check if packed in APK assets
             if (!modelFile.exists()) {
@@ -111,10 +195,10 @@ public class VieNeuAudioCppPlugin extends Plugin {
             }
         }
 
-        if (!modelFile.exists()) {
+        if (!modelFile.exists() || modelFile.length() < 10000000) {
             JSObject res = new JSObject();
             res.put("success", false);
-            res.put("error", "Model file not found: " + modelFile.getAbsolutePath() + ". Đang tự động tải mô hình vieneu_v3_turbo.gguf...");
+            res.put("error", "Chưa tìm thấy file mô hình: " + modelFile.getAbsolutePath() + ". Vui lòng bấm Tải mô hình.");
             call.resolve(res);
             return;
         }
@@ -146,55 +230,118 @@ public class VieNeuAudioCppPlugin extends Plugin {
     public void downloadModel(PluginCall call) {
         new Thread(() -> {
             try {
-                File modelDir = new File(getContext().getFilesDir(), "models");
+                File modelsRoot = new File(getContext().getFilesDir(), "models");
+                File modelDir = new File(modelsRoot, "VieNeu-TTS-v3-Turbo");
                 if (!modelDir.exists()) {
                     modelDir.mkdirs();
                 }
-                File modelFile = new File(modelDir, "vieneu_v3_turbo.gguf");
+                File speechTokenizerDir = new File(modelDir, "speech_tokenizer");
+                if (!speechTokenizerDir.exists()) {
+                    speechTokenizerDir.mkdirs();
+                }
 
                 String modelUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true";
-                Log.i(TAG, "Downloading VieNeu Turbo GGUF model from " + modelUrl);
+                String configUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/config.json?download=true";
+                String tokenizerUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true";
+                String tokenizerConfigUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true";
+                String specialTokensUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/special_tokens_map.json?download=true";
+                String speechTokenizerConfigUrl = "https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/speech_tokenizer/config.json?download=true";
 
-                java.net.URL url = new java.net.URL(modelUrl);
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setInstanceFollowRedirects(true);
-                conn.connect();
+                Log.i(TAG, "Starting complete download of VieNeu-TTS-v3-Turbo audio.cpp package...");
 
-                if (conn.getResponseCode() != java.net.HttpURLConnection.HTTP_OK) {
+                // 1. Download auxiliary JSON and tokenizer files
+                downloadSingleFile(configUrl, new File(modelDir, "config.json"));
+                downloadSingleFile(tokenizerUrl, new File(modelDir, "tokenizer.json"));
+                downloadSingleFile(tokenizerConfigUrl, new File(modelDir, "tokenizer_config.json"));
+                downloadSingleFile(specialTokensUrl, new File(modelDir, "special_tokens_map.json"));
+                downloadSingleFile(speechTokenizerConfigUrl, new File(speechTokenizerDir, "config.json"));
+
+                // Also place tokenizer in models/ root for legacy lookups
+                downloadSingleFile(tokenizerUrl, new File(modelsRoot, "tokenizer.json"));
+
+                // 2. Download model.gguf (following 307/302 redirects)
+                File finalModel = new File(modelDir, "model.gguf");
+                File tmpModel = new File(modelDir, "model.gguf.tmp");
+
+                HttpURLConnection conn = openConnectionWithRedirects(modelUrl);
+                int status = conn.getResponseCode();
+                if (status != HttpURLConnection.HTTP_OK) {
+                    conn.disconnect();
                     JSObject res = new JSObject();
                     res.put("success", false);
-                    res.put("error", "HTTP " + conn.getResponseCode() + " when downloading model");
+                    res.put("error", "Server HTTP " + status + " khi tải mô hình GGUF");
                     call.resolve(res);
                     return;
                 }
 
+                long contentLength = conn.getContentLengthLong();
                 InputStream input = conn.getInputStream();
-                FileOutputStream output = new FileOutputStream(modelFile);
-                byte[] data = new byte[16384];
+                FileOutputStream output = new FileOutputStream(tmpModel);
+                byte[] data = new byte[32768];
                 int count;
                 long total = 0;
+                long lastProgressTime = 0;
 
                 while ((count = input.read(data)) != -1) {
                     output.write(data, 0, count);
                     total += count;
+
+                    long now = System.currentTimeMillis();
+                    if (now - lastProgressTime > 400) {
+                        lastProgressTime = now;
+                        int percent = contentLength > 0 ? (int) ((total * 100) / contentLength) : -1;
+                        JSObject progressObj = new JSObject();
+                        progressObj.put("percent", percent);
+                        progressObj.put("downloadedBytes", total);
+                        progressObj.put("totalBytes", contentLength);
+                        notifyListeners("vieneuDownloadProgress", progressObj);
+                    }
                 }
 
                 output.flush();
                 output.close();
                 input.close();
+                conn.disconnect();
 
-                Log.i(TAG, "VieNeu Turbo model downloaded successfully: " + total + " bytes");
+                if (total < 10000000) { // under 10MB means truncated or HTML error
+                    tmpModel.delete();
+                    JSObject res = new JSObject();
+                    res.put("success", false);
+                    res.put("error", "File tải về quá nhỏ (" + total + " bytes), vui lòng thử lại.");
+                    call.resolve(res);
+                    return;
+                }
+
+                if (finalModel.exists()) {
+                    finalModel.delete();
+                }
+                tmpModel.renameTo(finalModel);
+
+                // Copy to models/ root as legacy alias
+                File legacyAlias = new File(modelsRoot, "vieneu_v3_turbo.gguf");
+                if (!legacyAlias.exists()) {
+                    try {
+                        java.nio.file.Files.copy(finalModel.toPath(), legacyAlias.toPath());
+                    } catch (Throwable _) {}
+                }
+
+                sModelFilePath = finalModel.getAbsolutePath();
+                sModelInitialized = true;
+                double sizeMb = Math.round((total / (1024.0 * 1024.0)) * 10.0) / 10.0;
+
+                Log.i(TAG, "VieNeu Turbo model downloaded successfully: " + total + " bytes (" + sizeMb + " MB)");
 
                 JSObject res = new JSObject();
                 res.put("success", true);
-                res.put("modelPath", modelFile.getAbsolutePath());
+                res.put("modelPath", finalModel.getAbsolutePath());
                 res.put("sizeBytes", total);
+                res.put("sizeMb", sizeMb);
                 call.resolve(res);
             } catch (Exception e) {
                 Log.e(TAG, "Failed to download model", e);
                 JSObject res = new JSObject();
                 res.put("success", false);
-                res.put("error", e.getMessage());
+                res.put("error", e.getMessage() != null ? e.getMessage() : "Lỗi kết nối tải mô hình");
                 call.resolve(res);
             }
         }).start();

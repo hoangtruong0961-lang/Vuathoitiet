@@ -80,3 +80,11 @@ bin/*
 *.onnx
 public/*.onnx
 nghi-tts audio/
+models/
+vieneu-tts-turbo/
+audio.cpp/
+*.gguf
+*.bin
+*.pt
+*.safetensors
+

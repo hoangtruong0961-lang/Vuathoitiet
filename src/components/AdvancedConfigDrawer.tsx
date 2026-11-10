@@ -779,7 +779,7 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
                       </div>
 
                       <p className="text-[11px] text-slate-400 leading-relaxed">
-                        Ứng dụng sẽ tự động tải 3 file mô hình (<span className="text-purple-300 font-mono">model.gguf</span>, <span className="text-purple-300 font-mono">tokenizer.json</span>, <span className="text-purple-300 font-mono">tokenizer_config.json</span>) thẳng vào bộ nhớ ứng dụng / server để phát thuyết minh Offline siêu tốc giống Piper TTS / Sherpa-ONNX.
+                        Ứng dụng sẽ tự động tải trọn bộ gói mô hình <span className="text-purple-300 font-mono">audio.cpp</span> (<span className="text-purple-300 font-mono">model.gguf</span>, <span className="text-purple-300 font-mono">config.json</span>, <span className="text-purple-300 font-mono">tokenizer.json</span>, <span className="text-purple-300 font-mono">special_tokens_map.json</span>, <span className="text-purple-300 font-mono">speech_tokenizer/config.json</span>) thẳng vào bộ nhớ ứng dụng / server để phát thuyết minh Offline siêu tốc giống Piper TTS / Sherpa-ONNX.
                       </p>
                     </div>
 
