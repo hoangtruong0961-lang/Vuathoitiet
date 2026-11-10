@@ -1,5 +1,11 @@
 import { registerPlugin, Capacitor } from '@capacitor/core';
 
+export const VIENEU_TURBO_HF_URLS = {
+  modelGguf: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true',
+  tokenizer: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true',
+  tokenizerConfig: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true',
+};
+
 export interface VieNeuAudioCppStatus {
   isNativeLibraryLoaded: boolean;
   isModelInitialized: boolean;

@@ -1,4 +1,5 @@
 import { TTSWorkerMessage, TTSWorkerResponse, AudioOutputHeader } from '../types';
+import { resolveApiUrl } from '../utils/apiUrl';
 
 /**
  * TTS Web Worker
@@ -44,7 +45,7 @@ self.onmessage = async (e: MessageEvent<TTSWorkerMessage>) => {
     try {
       const effectiveDuration = targetDuration || duration;
       // Delegate synthesis fetch to server API with full 3-layer sync parameters
-      const res = await fetch('/api/tts', {
+      const res = await fetch(resolveApiUrl('/api/tts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

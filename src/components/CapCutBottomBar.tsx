@@ -77,6 +77,7 @@ import { CustomColorPicker } from './CustomColorPicker';
 import { wrapSubtitleText, parseSRT, exportToSRT, exportToASS, exportToVTT, exportToTXT } from '../utils/srtParser';
 import { generateVoiceoverWav } from '../utils/audioExporter';
 import { cleanTranslatedSubtitleText } from '../utils/subtitleCleaner';
+import { resolveApiUrl } from '../utils/apiUrl';
 
 interface CapCutBottomBarProps {
   activeTab: CapCutTab | null;
@@ -934,7 +935,7 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
 
   const checkNghiStatus = async (voiceKey: string, autoDownloadIfMissing = false) => {
     try {
-      const res = await fetch('/api/tts/nghi-status', {
+      const res = await fetch(resolveApiUrl('/api/tts/nghi-status'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nghiVoice: voiceKey }),
@@ -971,7 +972,7 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
     setIsDownloadingNghi(true);
     setDownloadMsg(`⏳ Đang tải về mô hình giọng đọc ${voiceName}... Vui lòng đợi trong giây lát!`);
     try {
-      const res = await fetch('/api/tts/nghi-download', {
+      const res = await fetch(resolveApiUrl('/api/tts/nghi-download'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nghiVoice: voiceKey }),
@@ -2352,7 +2353,7 @@ export const CapCutBottomBar: React.FC<CapCutBottomBarProps> = ({
                           type="button"
                           onClick={async () => {
                             try {
-                              await fetch('/api/tts/clear-cache', { method: 'POST' });
+                              await fetch(resolveApiUrl('/api/tts/clear-cache'), { method: 'POST' });
                               setIsCacheCleared(true);
                               setTimeout(() => setIsCacheCleared(false), 2500);
                             } catch {}

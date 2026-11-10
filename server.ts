@@ -2563,6 +2563,88 @@ ${JSON.stringify(compactChunk)}`;
     }
   });
 
+  // Constant URLs for VieNeu-TTS v3 Turbo GGUF model files (Hugging Face official repository)
+  const VIENEU_TURBO_MODEL_URLS = {
+    modelGguf: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true',
+    tokenizer: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true',
+    tokenizerConfig: 'https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true',
+  };
+
+  // 7. VieNeu Turbo GGUF Status Endpoint
+  app.post('/api/tts/vieneu-status', async (_req, res) => {
+    try {
+      const vieneuDir = path.join(process.cwd(), 'vieneu-tts-turbo');
+      const modelPath = path.join(vieneuDir, 'model.gguf');
+      const tokenizerPath = path.join(vieneuDir, 'tokenizer.json');
+      const tokenizerConfigPath = path.join(vieneuDir, 'tokenizer_config.json');
+
+      const modelExists = fs.existsSync(modelPath) && fs.statSync(modelPath).size > 1000000;
+      const tokenizerExists = fs.existsSync(tokenizerPath) && fs.statSync(tokenizerPath).size > 100;
+      const tokenizerConfigExists = fs.existsSync(tokenizerConfigPath) && fs.statSync(tokenizerConfigPath).size > 10;
+
+      let modelSizeMb = 0;
+      if (modelExists) {
+        modelSizeMb = Math.round((fs.statSync(modelPath).size / (1024 * 1024)) * 10) / 10;
+      }
+
+      res.json({
+        success: true,
+        urls: VIENEU_TURBO_MODEL_URLS,
+        ready: modelExists && tokenizerExists && tokenizerConfigExists,
+        modelExists,
+        tokenizerExists,
+        tokenizerConfigExists,
+        modelSizeMb,
+      });
+    } catch (e: any) {
+      res.status(500).json({ success: false, error: e.message });
+    }
+  });
+
+  // 8. VieNeu Turbo GGUF Download Endpoint
+  app.post('/api/tts/vieneu-download', async (_req, res) => {
+    try {
+      const vieneuDir = path.join(process.cwd(), 'vieneu-tts-turbo');
+      fs.mkdirSync(vieneuDir, { recursive: true });
+
+      const modelPath = path.join(vieneuDir, 'model.gguf');
+      const tokenizerPath = path.join(vieneuDir, 'tokenizer.json');
+      const tokenizerConfigPath = path.join(vieneuDir, 'tokenizer_config.json');
+
+      console.log('[VieNeu Turbo Download] Downloading VieNeu v3 Turbo GGUF files from Hugging Face...');
+
+      const okTokenizer = await ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.tokenizer, tokenizerPath, 50);
+      if (!okTokenizer) {
+        res.status(500).json({ success: false, error: 'Không thể tải file tokenizer.json' });
+        return;
+      }
+
+      const okConfig = await ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.tokenizerConfig, tokenizerConfigPath, 10);
+      if (!okConfig) {
+        res.status(500).json({ success: false, error: 'Không thể tải file tokenizer_config.json' });
+        return;
+      }
+
+      const okModel = await ensureFileDownloaded(VIENEU_TURBO_MODEL_URLS.modelGguf, modelPath, 10000000);
+      if (!okModel) {
+        res.status(500).json({ success: false, error: 'Không thể tải file model.gguf' });
+        return;
+      }
+
+      const sizeMb = Math.round((fs.statSync(modelPath).size / (1024 * 1024)) * 10) / 10;
+
+      res.json({
+        success: true,
+        message: `Đã tải thành công mô hình VieNeu-TTS v3 Turbo GGUF (${sizeMb} MB) và tokenizer!`,
+        sizeMb,
+        urls: VIENEU_TURBO_MODEL_URLS,
+      });
+    } catch (e: any) {
+      console.error('[VieNeu Turbo Download Error]', e);
+      res.status(500).json({ success: false, error: e.message || 'Lỗi khi tải mô hình VieNeu Turbo' });
+    }
+  });
+
   // High-Speed Local TTS Cache & Multi-threaded Worker Pool Manager
   let lastTikTokRequestTime = 0;
   let cachedProxiflyProxy = '';
@@ -3453,12 +3535,7 @@ ${JSON.stringify(compactChunk)}`;
     const candidateUrls = [
       apiUrl?.trim(),
       'http://127.0.0.1:8000',
-      'http://localhost:8000',
-      'https://pnnbao-ump-vieneu-tts-v3-turbo.hf.space',
-      ...(isTurbo ? ['https://vieneu-vieneutts-turbo.hf.space', 'https://pylong-vieneutts-turbo.hf.space', 'https://vtranslate-vieneutts-turbo.hf.space'] : []),
-      'https://vieneu-vieneutts.hf.space',
-      'https://pylong-vieneutts.hf.space',
-      'https://vtranslate-vieneutts.hf.space'
+      'https://pnnbao-ump-vieneu-tts-v3-turbo.hf.space'
     ].filter(Boolean) as string[];
 
     const label = refAudioBase64 ? `Giọng Clone (${clonedVoiceName || turboVoice})` : (isTurbo ? 'VieNeuTTS v3 Turbo' : 'VieNeuTTS');
@@ -3486,7 +3563,7 @@ ${JSON.stringify(compactChunk)}`;
                   speed: rate,
                   ref_audio_base64: refAudioBase64 || undefined
                 }),
-                signal: AbortSignal.timeout(isLocal ? 1500 : (isTurbo ? 5000 : 8000))
+                signal: AbortSignal.timeout(isLocal ? 1000 : 3500)
               });
               if (oaiRes.ok) {
                 const buf = Buffer.from(await oaiRes.arrayBuffer());
@@ -3511,7 +3588,7 @@ ${JSON.stringify(compactChunk)}`;
               const upRes = await fetch(`${cleanBase}/gradio_api/upload`, {
                 method: 'POST',
                 body: formData,
-                signal: AbortSignal.timeout(5000)
+                signal: AbortSignal.timeout(3000)
               });
               if (upRes.ok) {
                 const upJson = (await upRes.json()) as any;
@@ -3534,7 +3611,7 @@ ${JSON.stringify(compactChunk)}`;
             body: JSON.stringify({
               data: [text, turboVoice, fileObj || null, 0.8, 25, 0.95, 1.2, 300, 256]
             }),
-            signal: AbortSignal.timeout(isLocal ? 1000 : (isTurbo ? 5000 : 7000))
+            signal: AbortSignal.timeout(isLocal ? 1000 : 3500)
           });
 
           if (callRes.ok) {
@@ -3542,10 +3619,15 @@ ${JSON.stringify(compactChunk)}`;
             const eventId = callJson?.event_id;
             if (eventId) {
               const streamRes = await fetch(`${cleanBase}/gradio_api/call/synthesize/${eventId}`, {
-                signal: AbortSignal.timeout(isTurbo ? 7000 : 10000)
+                signal: AbortSignal.timeout(6000)
               });
               if (streamRes.ok) {
                 const sseText = await streamRes.text();
+                // If HF space reports ZeroGPU quota or error, abort searching this space immediately
+                if (sseText.includes('event: error')) {
+                  console.warn('[VieNeu HF Space ZeroGPU Error/Limit]');
+                  break;
+                }
                 const lines = sseText.split('\n');
                 for (let i = 0; i < lines.length; i++) {
                   if (lines[i].startsWith('data:')) {
@@ -3553,7 +3635,7 @@ ${JSON.stringify(compactChunk)}`;
                       const payload = JSON.parse(lines[i].replace(/^data:\s*/, ''));
                       if (Array.isArray(payload) && payload[0]?.url) {
                         const fileUrl = payload[0].url.startsWith('http') ? payload[0].url : `${cleanBase}${payload[0].url}`;
-                        const audioRes = await fetch(fileUrl, { signal: AbortSignal.timeout(7000) });
+                        const audioRes = await fetch(fileUrl, { signal: AbortSignal.timeout(5000) });
                         if (audioRes.ok) {
                           const buf = Buffer.from(await audioRes.arrayBuffer());
                           if (buf.length > 200) {
@@ -3569,32 +3651,6 @@ ${JSON.stringify(compactChunk)}`;
           }
         } catch (_) {}
 
-        // 3. Try legacy Gradio /api/predict
-        const res = await fetch(`${cleanBase}/api/predict`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ data: [text, turboVoice, rate] }),
-          signal: AbortSignal.timeout(isTurbo ? 3500 : 6000)
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          if (json && json.data && json.data[0]) {
-            const item = json.data[0];
-            const audioUrl = typeof item === 'string' ? item : (item.name || item.url);
-            if (audioUrl) {
-              const fullUrl = audioUrl.startsWith('http') ? audioUrl : `${cleanBase}/file=${audioUrl}`;
-              const audioRes = await fetch(fullUrl, { signal: AbortSignal.timeout(isTurbo ? 4000 : 6000) });
-              if (audioRes.ok) {
-                const arrayBuf = await audioRes.arrayBuffer();
-                const buf = Buffer.from(arrayBuf);
-                if (buf.length > 200) {
-                  return { audioBuffer: buf, displayName: `${label} HF Space (${turboVoice})` };
-                }
-              }
-            }
-          }
-        }
       } catch (_) {}
     }
 
@@ -3627,9 +3683,22 @@ ${JSON.stringify(compactChunk)}`;
       }
     } catch (_) {}
 
-    const mappedEdgeVoice = mapped.isMale ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
-    const edgeBuf = await fetchMsEdgeTTS(text, mappedEdgeVoice, rate);
-    return { audioBuffer: edgeBuf, displayName: `Dự phòng EdgeTTS (${mapped.name}) [HF bận]` };
+    try {
+      const mappedEdgeVoice = mapped.isMale ? 'vi-VN-NamMinhNeural' : 'vi-VN-HoaiMyNeural';
+      const edgeBuf = await fetchMsEdgeTTS(text, mappedEdgeVoice, rate);
+      if (edgeBuf && edgeBuf.length > 200) {
+        return { audioBuffer: edgeBuf, displayName: `Dự phòng EdgeTTS (${mapped.name}) [HF bận]` };
+      }
+    } catch (_) {}
+
+    try {
+      const gBuf = await fetchGoogleTranslateTTS(text);
+      if (gBuf && gBuf.length > 100) {
+        return { audioBuffer: gBuf, displayName: `Dự phòng (${mapped.name})` };
+      }
+    } catch (_) {}
+
+    return { audioBuffer: null, displayName: `${label} (${turboVoice})` };
   };
 
   const generateTTSAudioHelper = async (options: {

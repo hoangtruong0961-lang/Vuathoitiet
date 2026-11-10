@@ -23,9 +23,9 @@ export function getBackendBaseUrl(): string {
     }
   }
 
-  // If on mobile APK without explicit override, use the official deployment
+  // If on mobile APK without explicit override, use the active deployment
   if (Capacitor.isNativePlatform()) {
-    return 'https://thiantai.onrender.com';
+    return 'https://ais-pre-cpaarfq5jcgibgcn6qmuh6-84647946985.asia-southeast1.run.app';
   }
 
   // If on Web / Dev server, relative paths hit the host directly

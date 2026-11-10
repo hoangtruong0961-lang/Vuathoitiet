@@ -758,21 +758,66 @@ export const AdvancedConfigDrawer: React.FC<AdvancedConfigDrawerProps> = ({
                 </div>
 
                 {(formData.ttsProvider === 'vieneu_tts' || formData.ttsProvider === 'vieneu_turbo' || formData.ttsProvider === 'cloned_voice') && (
-                  <div className="bg-[#0d0d11] border border-slate-800 p-3 rounded-2xl space-y-1.5 col-span-1 sm:col-span-2">
+                  <div className="bg-[#0d0d11] border border-purple-900/40 p-3.5 rounded-2xl space-y-2.5 col-span-1 sm:col-span-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-semibold text-purple-300 block">Tùy chọn Endpoint audio.cpp / VieNeu Server (OpenAI format):</label>
-                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded-full font-mono">audio.cpp + Capacitor</span>
+                      <label className="text-[11px] font-semibold text-purple-300 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-purple-400 animate-pulse" />
+                        <span>Tải Mô hình VieNeu-TTS v3 Turbo GGUF (Chính thức):</span>
+                      </label>
+                      <span className="text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded-full font-mono">VieNeu.cpp / audio.cpp</span>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="e.g. http://192.168.1.x:8000 hoặc https://xxxx.trycloudflare.com (để trống nếu chạy local)"
-                      value={formData.vieneuApiUrl || ''}
-                      onChange={(e) => handleChange('vieneuApiUrl', e.target.value)}
-                      className="w-full bg-[#16161e] border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-600"
-                    />
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      💡 <strong>2 hướng chạy VieNeu Turbo:</strong> (1) Server <span className="text-purple-300 font-mono">audio.cpp</span> GGUF siêu nhẹ trên PC/Colab (tương thích OpenAI API), hoặc (2) Native Capacitor Plugin trên APK Android.
-                    </p>
+
+                    <div className="bg-[#14141c] border border-purple-950/70 p-2.5 rounded-xl space-y-2">
+                      <p className="text-[10.5px] text-slate-300 leading-relaxed font-medium">
+                        🔗 <strong>Link tải trực tiếp từ HuggingFace (phuocnguyen90):</strong>
+                      </p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                        <a
+                          href="https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/model.gguf?download=true"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between bg-[#1c1c28] hover:bg-purple-900/30 border border-purple-800/50 px-2.5 py-1.5 rounded-lg text-[11px] text-purple-200 font-medium transition cursor-pointer group"
+                        >
+                          <span className="truncate">📦 model.gguf (~170MB)</span>
+                          <DownloadCloud className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform flex-shrink-0 ml-1" />
+                        </a>
+
+                        <a
+                          href="https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer.json?download=true"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between bg-[#1c1c28] hover:bg-purple-900/30 border border-purple-800/50 px-2.5 py-1.5 rounded-lg text-[11px] text-purple-200 font-medium transition cursor-pointer group"
+                        >
+                          <span className="truncate">📄 tokenizer.json</span>
+                          <DownloadCloud className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform flex-shrink-0 ml-1" />
+                        </a>
+
+                        <a
+                          href="https://huggingface.co/phuocnguyen90/VieNeu-TTS-v3-Turbo-GGUF/resolve/main/tokenizer_config.json?download=true"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between bg-[#1c1c28] hover:bg-purple-900/30 border border-purple-800/50 px-2.5 py-1.5 rounded-lg text-[11px] text-purple-200 font-medium transition cursor-pointer group"
+                        >
+                          <span className="truncate">⚙️ tokenizer_config.json</span>
+                          <DownloadCloud className="w-3.5 h-3.5 text-purple-400 group-hover:scale-110 transition-transform flex-shrink-0 ml-1" />
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="pt-1">
+                      <label className="text-[11px] font-semibold text-slate-300 block mb-1">Tùy chọn Endpoint audio.cpp / VieNeu Server (OpenAI format):</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. http://192.168.1.x:8000 hoặc https://xxxx.trycloudflare.com (để trống nếu chạy local/APK)"
+                        value={formData.vieneuApiUrl || ''}
+                        onChange={(e) => handleChange('vieneuApiUrl', e.target.value)}
+                        className="w-full bg-[#16161e] border border-slate-700 rounded-xl p-2 text-xs text-white focus:outline-none focus:border-purple-400 placeholder:text-slate-600"
+                      />
+                      <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
+                        💡 <strong>Hướng dẫn sử dụng:</strong> Tải 3 file trên thả vào thư mục <span className="text-purple-300 font-mono">models/</span> của máy tính chạy <span className="text-purple-300 font-mono">audio.cpp</span> hoặc ứng dụng Android APK để phát thuyết minh VieNeu Turbo siêu tốc offline.
+                      </p>
+                    </div>
                   </div>
                 )}
 

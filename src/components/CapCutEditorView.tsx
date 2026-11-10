@@ -53,6 +53,7 @@ import { ConfigView } from './ConfigView';
 import { ExportSettingsConfig } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { VieNeuAudioCpp, isNativeVieNeuAvailable } from '../plugins/vieneuAudioCpp';
+import { resolveApiUrl } from '../utils/apiUrl';
 
 interface CapCutEditorViewProps {
   project: Project;
@@ -2740,7 +2741,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
         } catch (_) {}
       }
 
-      const res = await fetch('/api/tts', {
+      const res = await fetch(resolveApiUrl('/api/tts'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2779,21 +2780,41 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
       }
 
       if (!res.ok || !data.success || !data.audioBase64) {
-        console.warn('[Chunk TTS Primary Failed - Retrying Edge TTS Fallback]', res.status, data.error || data.message || rawText.slice(0, 150));
-        const fbRes = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: textChunk,
-            provider: 'edge_tts',
-            edgeVoice: currentSettings.edgeVoice || 'vi-VN-HoaiMyNeural',
-            ttsSpeed: speed,
-          }),
-        });
-        const fbData = await fbRes.json().catch(() => ({}));
-        if (fbData && fbData.audioBase64) {
-          return fbData.audioBase64;
-        }
+        console.warn('[Chunk TTS Primary Failed - Retrying CapCut Fallback]', res.status, data.error || data.message || rawText.slice(0, 150));
+        try {
+          const fbCapcut = await fetch(resolveApiUrl('/api/tts'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: textChunk,
+              provider: 'capcut_tts',
+              capcutVoice: currentSettings.capcutVoice || 'BV075_streaming',
+              ttsSpeed: speed,
+            }),
+          });
+          const fbCapData = await fbCapcut.json().catch(() => ({}));
+          if (fbCapData && fbCapData.audioBase64) {
+            return fbCapData.audioBase64;
+          }
+        } catch (_) {}
+
+        try {
+          const fbRes = await fetch(resolveApiUrl('/api/tts'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: textChunk,
+              provider: 'edge_tts',
+              edgeVoice: currentSettings.edgeVoice || 'vi-VN-HoaiMyNeural',
+              ttsSpeed: speed,
+            }),
+          });
+          const fbData = await fbRes.json().catch(() => ({}));
+          if (fbData && fbData.audioBase64) {
+            return fbData.audioBase64;
+          }
+        } catch (_) {}
+
         return null;
       }
 
@@ -2804,19 +2825,19 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
       console.warn('Error fetching chunk TTS, trying fallback:', e);
       try {
         const currentSettings = appSettingsRef.current || appSettings;
-        const fbRes = await fetch('/api/tts', {
+        const fbCapcut = await fetch(resolveApiUrl('/api/tts'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: textChunk,
-            provider: 'edge_tts',
-            edgeVoice: currentSettings.edgeVoice || 'vi-VN-HoaiMyNeural',
+            provider: 'capcut_tts',
+            capcutVoice: currentSettings.capcutVoice || 'BV075_streaming',
             ttsSpeed: speed,
           }),
         });
-        const fbData = await fbRes.json().catch(() => ({}));
-        if (fbData && fbData.audioBase64) {
-          return fbData.audioBase64;
+        const fbCapData = await fbCapcut.json().catch(() => ({}));
+        if (fbCapData && fbCapData.audioBase64) {
+          return fbCapData.audioBase64;
         }
       } catch (_) {}
     }
@@ -3029,7 +3050,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
         try {
           const currentSettings = appSettingsRef.current || appSettings;
           const activeClone = currentSettings.clonedVoices?.find(v => v.id === currentSettings.activeClonedVoiceId) || currentSettings.clonedVoices?.[0];
-          const res = await fetch('/api/tts/batch', {
+          const res = await fetch(resolveApiUrl('/api/tts/batch'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3153,7 +3174,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
     audioBufferCacheRef.current.clear();
     setSubtitles((prev) => prev.map((s) => ({ ...s, audioUrl: undefined })));
     try {
-      await fetch('/api/tts/clear-cache', { method: 'POST' });
+      await fetch(resolveApiUrl('/api/tts/clear-cache'), { method: 'POST' });
     } catch {}
   };
 
@@ -3171,7 +3192,7 @@ export const CapCutEditorView: React.FC<CapCutEditorViewProps> = ({
     try {
       const currentSettings = appSettingsRef.current || appSettings;
       const activeClone = currentSettings.clonedVoices?.find(v => v.id === currentSettings.activeClonedVoiceId) || currentSettings.clonedVoices?.[0];
-      const res = await fetch('/api/tts/batch', {
+      const res = await fetch(resolveApiUrl('/api/tts/batch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
