@@ -50,11 +50,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    externalNativeBuild {
-        cmake {
-            path "src/main/cpp/CMakeLists.txt"
-        }
-    }
     packagingOptions {
         pickFirst '**/libc++_shared.so'
         pickFirst 'lib/arm64-v8a/libc++_shared.so'
