@@ -6,16 +6,7 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
 
     signingConfigs {
-        release {
-            def ksFile = file('app-signing.keystore')
-            if (ksFile.exists()) {
-                storeFile ksFile
-                storePassword 'bachduong123'
-                keyAlias 'bachremix'
-                keyPassword 'bachduong123'
-            }
-        }
-        debug {
+        create("release") {
             def ksFile = file('app-signing.keystore')
             if (ksFile.exists()) {
                 storeFile ksFile
@@ -41,13 +32,19 @@ android {
     }
     buildTypes {
         debug {
-            if (signingConfigs.debug.storeFile != null && signingConfigs.debug.storeFile.exists()) {
+            def releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning != null && releaseSigning.storeFile != null && releaseSigning.storeFile.exists()) {
+                signingConfig releaseSigning
+            } else {
                 signingConfig signingConfigs.debug
             }
         }
         release {
-            if (signingConfigs.release.storeFile != null && signingConfigs.release.storeFile.exists()) {
-                signingConfig signingConfigs.release
+            def releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning != null && releaseSigning.storeFile != null && releaseSigning.storeFile.exists()) {
+                signingConfig releaseSigning
+            } else {
+                signingConfig signingConfigs.debug
             }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
