@@ -322,7 +322,7 @@ public class VieNeuAudioCppPlugin extends Plugin {
                 if (!legacyAlias.exists()) {
                     try {
                         java.nio.file.Files.copy(finalModel.toPath(), legacyAlias.toPath());
-                    } catch (Throwable _) {}
+                    } catch (Throwable ignored) {}
                 }
 
                 sModelFilePath = finalModel.getAbsolutePath();
